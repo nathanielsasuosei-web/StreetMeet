@@ -2,7 +2,15 @@ function Login() {
   return <h1>Login Page</h1>;
 }
 
-export default Status;function Status(){
+function Status() {
+  return (
+    <div>
+      <h1>Status</h1>
+    </div>
+  );
+}
+
+export default Status;
 
 return(
 
@@ -27,6 +35,6 @@ Create Status
 
 )
 
-}
+
 
 export default Status;
