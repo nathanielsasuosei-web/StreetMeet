@@ -57,4 +57,46 @@ message:error.message
 
 }
 
+}import Subscription from "../models/Subscription.js";
+
+
+export const createPayment = async(req,res)=>{
+
+try{
+
+const {plan,amount}=req.body;
+
+
+const payment = await Subscription.create({
+
+user:req.user.id,
+
+plan,
+
+amount,
+
+status:"pending"
+
+});
+
+
+res.json({
+
+message:"Payment created",
+
+payment
+
+});
+
+
 }
+catch(error){
+
+res.status(500)
+.json({
+error:error.message
+});
+
+}
+
+};
