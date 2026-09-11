@@ -1,0 +1,46 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug API",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/backend",
+      "program": "${workspaceFolder}/backend/src/server.js",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "envFile": "${workspaceFolder}/backend/.env"
+    },
+    {
+      "name": "Attach to API (9229)",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "restart": true,
+      "cwd": "${workspaceFolder}/backend",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Debug website (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/web/src"
+    },
+    {
+      "name": "Run migrations",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/backend",
+      "program": "${workspaceFolder}/backend/src/db/migrate.js",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/backend/.env"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "API + Website",
+      "configurations": ["Debug API", "Debug website (Chrome)"]
+    }
+  ]
+}

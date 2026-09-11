@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "natthesisa",
+    "slug": "natthesisa",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "natthesisa",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.natthesisa.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "natthesisa needs the camera for video calls and profile photos.",
+        "NSMicrophoneUsageDescription": "natthesisa needs the microphone for voice and video calls.",
+        "NSPhotoLibraryUsageDescription": "natthesisa needs photo access so you can post a status."
+      }
+    },
+    "android": {
+      "package": "com.natthesisa.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#120A1F",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "MODIFY_AUDIO_SETTINGS",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "natthesisa needs photo access so you can post a status and share photos in chat.",
+          "cameraPermission": "natthesisa needs the camera for video calls and profile photos."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "apiUrl": ""
+    }
+  }
+}

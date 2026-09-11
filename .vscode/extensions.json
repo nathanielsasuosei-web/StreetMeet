@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "expo.vscode-expo-tools",
+    "humao.rest-client",
+    "eamodio.gitlens",
+    "ms-vscode.vscode-node-debug",
+    "christian-kohler.npm-intellisense",
+    "ms-azuretools.vscode-docker"
+  ]
+}

@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+
+# secrets
+.env
+.env.local
+.env.*.local
+*.pem
+google-play-service-account.json
+
+# builds
+dist/
+dist-ssr/
+web/dist/
+.expo/
+mobile/android/
+mobile/ios/
+*.aab
+*.apk
+*.ipa
+
+# uploads / local data
+backend/public/uploads/*
+!backend/public/uploads/.gitkeep
+backend/uploads/
+
+# logs & caches
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+*.tsbuildinfo

@@ -1,9 +1,10 @@
 import jwt from "jsonwebtoken";
+import { env } from "../config/env.js";
 
-export function createToken(userId) {
-  return jwt.sign(
-    { userId },
-    process.env.JWT_SECRET,
-    { expiresIn: "30d" }
-  );
+export function createToken(userId, extra = {}) {
+  return jwt.sign({ sub: userId, ...extra }, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
+}
+
+export function verifyToken(token) {
+  return jwt.verify(token, env.jwtSecret);
 }

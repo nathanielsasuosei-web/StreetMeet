@@ -1,0 +1,29 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.tabSize": 2,
+  "editor.rulers": [100],
+  "editor.stickyScroll.enabled": true,
+  "editor.bracketPairColorization.enabled": true,
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.expo": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/package-lock.json": true,
+    "**/drizzle": true
+  },
+  "javascript.preferences.importModuleSpecifierEnding": "js",
+  "typescript.tsdk": "mobile/node_modules/typescript/lib",
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[javascriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" }
+}

@@ -1,0 +1,22 @@
+{
+  "folders": [
+    { "name": "backend", "path": "backend" },
+    { "name": "web", "path": "web" },
+    { "name": "mobile", "path": "mobile" },
+    { "name": "docs", "path": "docs" }
+  ],
+  "settings": {
+    "editor.formatOnSave": true,
+    "files.eol": "\n",
+    "git.autofetch": true
+  },
+  "extensions": {
+    "recommendations": [
+      "esbenp.prettier-vscode",
+      "dbaeumer.vscode-eslint",
+      "expo.vscode-expo-tools",
+      "humao.rest-client",
+      "eamodio.gitlens"
+    ]
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run API",
+      "type": "npm",
+      "script": "dev",
+      "path": "backend",
+      "isBackground": true,
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Run Website",
+      "type": "npm",
+      "script": "dev",
+      "path": "web",
+      "isBackground": true,
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Run Mobile (Expo)",
+      "type": "npm",
+      "script": "start",
+      "path": "mobile",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Run All (API + Web)",
+      "dependsOn": ["Run API", "Run Website"],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "DB: migrate",
+      "type": "npm",
+      "script": "db:migrate",
+      "path": "backend",
+      "problemMatcher": []
+    },
+    {
+      "label": "DB: studio",
+      "type": "npm",
+      "script": "db:studio",
+      "path": "backend",
+      "problemMatcher": []
+    },
+    {
+      "label": "DB: seed",
+      "type": "npm",
+      "script": "seed",
+      "path": "backend",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build website",
+      "type": "npm",
+      "script": "build",
+      "path": "web",
+      "problemMatcher": []
+    }
+  ]
+}
