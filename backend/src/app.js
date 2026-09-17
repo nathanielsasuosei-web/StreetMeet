@@ -12,6 +12,7 @@ import { env } from "./config/env.js";
 import db from "./db/index.js";
 
 import authRoutes from "./routes/authRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 import billingRoutes from "./routes/billingRoutes.js";
 import discoverRoutes from "./routes/discoverRoutes.js";
 import matchRoutes from "./routes/matchRoutes.js";
@@ -32,7 +33,6 @@ import { apiLimiter } from "./middleware/rateLimiters.js";
  */
 const LEGACY_MODULES = [
   { mount: "/api/status", name: "status", file: "./routes/statusRoutes.js" },
-  { mount: "/api/admin", name: "admin", file: "./routes/adminRoutes.js" },
 ];
 
 async function probeLegacyModules() {
@@ -168,6 +168,7 @@ export async function createApp() {
   app.use("/api/matches", matchRoutes);
   app.use("/api/notifications", notificationRoutes);
   app.use("/api/billing", billingRoutes);
+  app.use("/api/admin", adminRoutes);
   app.use("/api", moderationRoutes); // /users/:id/block|report, /blocks
 
   /* ── Modules 2-6: guarded until they are rebuilt ─────────────────────── */

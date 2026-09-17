@@ -9,16 +9,14 @@ import {
   DISTANCE_STEPS_KM,
   GENDERS,
   GENDER_VALUES,
-  INTERESTS,
-  INTEREST_CATEGORIES,
   INTERESTS_MAX,
   INTERESTS_MIN,
   NAME_MAX_LENGTH,
   RELATIONSHIP_GOALS,
   RELATIONSHIP_GOAL_VALUES,
-  normaliseInterests,
 } from "../constants/profile.js";
 import { ApiError } from "../utils/apiError.js";
+import * as interestService from "./interestService.js";
 import { normaliseBirthDate } from "../utils/age.js";
 import { removeStoredImage, storeProfileImage } from "../middleware/upload.js";
 import { toPrivateProfile, toPublicProfile } from "../utils/serialize.js";
@@ -38,10 +36,14 @@ export async function loadProfileBundle(user) {
   return { user, interests, preferences, settings };
 }
 
-export function catalogue() {
+export async function catalogue() {
+  const [interests, interestCategories] = await Promise.all([
+    interestService.activeInterests(),
+    interestService.activeCategories(),
+  ]);
   return {
-    interests: INTERESTS,
-    interestCategories: INTEREST_CATEGORIES,
+    interests,
+    interestCategories,
     genders: GENDERS,
     relationshipGoals: RELATIONSHIP_GOALS,
     countries: COUNTRIES,
@@ -79,7 +81,7 @@ function assertBirthDate(value) {
   return result.value;
 }
 
-function assertInterests(value) {
+async function assertInterests(value) {
   if (value === undefined) return undefined;
   if (!Array.isArray(value)) {
     throw ApiError.unprocessable("Interests must be a list.", {
@@ -87,10 +89,19 @@ function assertInterests(value) {
     });
   }
 
-  const clean = normaliseInterests(value);
-  const unknown = value
-    .map((slug) => String(slug ?? "").trim().toLowerCase())
-    .filter((slug) => slug && !clean.includes(slug));
+  const requested = [
+    ...new Set(
+      value.map((slug) => String(slug ?? "").trim().toLowerCase()).filter(Boolean),
+    ),
+  ];
+  const catalogueRows = await interestService.activeInterests();
+  const known = new Set(catalogueRows.map((entry) => entry.slug));
+  const unknown = requested.filter((slug) => !known.has(slug));
+  // keep the curated order for the picks we know about
+  const order = catalogueRows.map((entry) => entry.slug);
+  const clean = requested
+    .filter((slug) => known.has(slug))
+    .sort((a, b) => order.indexOf(a) - order.indexOf(b));
 
   if (unknown.length) {
     throw ApiError.unprocessable(`Unknown interest(s): ${unknown.join(", ")}.`, {
@@ -213,7 +224,7 @@ export async function updateProfile(userId, payload) {
     fields.country = country || null;
   }
 
-  const interests = assertInterests(payload.interests);
+  const interests = await assertInterests(payload.interests);
 
   if (Object.keys(fields).length > 0) {
     await users.update(userId, fields);

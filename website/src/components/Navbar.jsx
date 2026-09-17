@@ -38,7 +38,15 @@ export function Navbar() {
     }
   }, [menuOpen])
 
-  const links = isAuthenticated ? [...PUBLIC_LINKS, ...APP_LINKS] : PUBLIC_LINKS
+  const links = isAuthenticated
+    ? [
+        ...PUBLIC_LINKS,
+        ...APP_LINKS,
+        ...(user?.role === 'ADMIN' || user?.role === 'MODERATOR'
+          ? [{ to: '/admin', label: 'Admin' }]
+          : []),
+      ]
+    : PUBLIC_LINKS
 
   async function signOut() {
     setMenuOpen(false)

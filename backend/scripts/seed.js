@@ -101,6 +101,7 @@ const DEMO_USERS = [
   {
     fullName: "Nana Adjei",
     email: "nana@streetmeet.dev",
+    role: "ADMIN",
     gender: "MAN",
     age: 35,
     city: "Kumasi",
@@ -167,6 +168,7 @@ async function seed() {
         birthDate: yearsAgo(demo.age),
         profileImage,
         verified: true,
+        role: demo.role ?? "USER",
       });
     } else {
       await db.transaction(async (tx) => {
@@ -182,7 +184,7 @@ async function seed() {
             city: demo.city,
             country: demo.country,
             profileImage,
-            role: "USER",
+            role: demo.role ?? "USER",
             verified: true,
             tokenVersion: 0,
             createdAt: now,

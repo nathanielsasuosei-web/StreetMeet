@@ -174,6 +174,28 @@ export const api = {
     readOne: (id) => request(`/api/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' }),
   },
 
+  admin: {
+    stats: () => request('/api/admin/stats'),
+    members: (params) => request(withQuery('/api/admin/users', params)),
+    member: (id) => request(`/api/admin/users/${encodeURIComponent(id)}`),
+    suspend: (id, note) => request(`/api/admin/users/${encodeURIComponent(id)}/suspend`, { method: 'POST', body: { note } }),
+    ban: (id, note) => request(`/api/admin/users/${encodeURIComponent(id)}/ban`, { method: 'POST', body: { note } }),
+    reinstate: (id) => request(`/api/admin/users/${encodeURIComponent(id)}/reinstate`, { method: 'POST' }),
+    verify: (id, verified) => request(`/api/admin/users/${encodeURIComponent(id)}/verify`, { method: 'POST', body: { verified } }),
+    feature: (id, featured) => request(`/api/admin/users/${encodeURIComponent(id)}/feature`, { method: 'POST', body: { featured } }),
+    setRole: (id, role) => request(`/api/admin/users/${encodeURIComponent(id)}/role`, { method: 'POST', body: { role } }),
+    reports: (status) => request(withQuery('/api/admin/reports', { status })),
+    resolveReport: (id, payload) => request(`/api/admin/reports/${encodeURIComponent(id)}/resolve`, { method: 'POST', body: payload }),
+    subscriptions: (params) => request(withQuery('/api/admin/subscriptions', params)),
+    terminateSubscription: (id) => request(`/api/admin/subscriptions/${encodeURIComponent(id)}/terminate`, { method: 'POST' }),
+    interests: () => request('/api/admin/interests'),
+    createInterest: (payload) => request('/api/admin/interests', { method: 'POST', body: payload }),
+    updateInterest: (slug, payload) => request(`/api/admin/interests/${encodeURIComponent(slug)}`, { method: 'PATCH', body: payload }),
+    deleteInterest: (slug) => request(`/api/admin/interests/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
+    announcements: () => request('/api/admin/announcements'),
+    announce: (payload) => request('/api/admin/announcements', { method: 'POST', body: payload }),
+  },
+
   settings: {
     get: () => request('/api/settings'),
     update: (payload) => request('/api/settings', { method: 'PATCH', body: payload }),

@@ -34,6 +34,18 @@ async function resolve(req) {
     throw new ApiError(403, "This account is deactivated.", { code: "ACCOUNT_DEACTIVATED" });
   }
 
+  if (user.accountStatus === "SUSPENDED") {
+    throw new ApiError(403, "This account is suspended. Contact support if you think this is a mistake.", {
+      code: "ACCOUNT_SUSPENDED",
+    });
+  }
+
+  if (user.accountStatus === "BANNED") {
+    throw new ApiError(403, "This account has been banned for violating our community rules.", {
+      code: "ACCOUNT_BANNED",
+    });
+  }
+
   if ((payload.tv ?? 0) !== user.tokenVersion) {
     throw ApiError.unauthorized("Your session was ended by a security change.", {
       code: "TOKEN_REVOKED",

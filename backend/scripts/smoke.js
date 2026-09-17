@@ -340,7 +340,7 @@ async function registerOnboard({ name, gender, birthDate, city, interestedIn, mi
     },
   });
   assertEqual(onboard.status, 200, `${name} onboard`);
-  return { token: reg.body.data.token, id: reg.body.data.user.id };
+  return { token: reg.body.data.token, id: reg.body.data.user.id, email: mail };
 }
 
 await check("GET /api/discover/deck offers only compatible, complete members", async () => {
@@ -916,11 +916,274 @@ await check("expired subscriptions drop back to free and get swept", async () =>
   );
 });
 
+/* ── module 4: admin control panel ───────────────────────────────────────── */
+const admin = {};
+
+await check("the admin API is closed to regular members", async () => {
+  const denied = await api("GET", "/api/admin/stats", { token: billing.buddy4.token });
+  assertEqual(denied.status, 403, "members are forbidden");
+
+  const anonymous = await api("GET", "/api/admin/stats");
+  assertEqual(anonymous.status, 401, "strangers are unauthorized");
+});
+
+await check("a promoted admin sees platform statistics and activity", async () => {
+  const { db } = await import("../src/db/index.js");
+  await db.run("UPDATE users SET role = 'ADMIN' WHERE id = ?", [session.id]);
+
+  const { status, body } = await api("GET", "/api/admin/stats", { token: session.token });
+  assertEqual(status, 200, "status");
+  assert(body.data.totals.members >= 6, "member count");
+  assert(body.data.totals.openReports >= 1, "the module-2 report is still open");
+  assertEqual(body.data.registrations.length, 14, "two weeks of registration buckets");
+  assertEqual(body.data.subscriptionActivity.length, 14, "two weeks of subscription buckets");
+  assert(body.data.recentMembers.length >= 5, "recent members");
+  assert(body.data.recentPayments.length >= 1, "the billing section left payments behind");
+});
+
+await check("admins can search and filter the member directory", async () => {
+  const found = await api("GET", "/api/admin/users?q=Fourth", { token: session.token });
+  assertEqual(found.status, 200, "status");
+  assert(found.body.data.items.some((member) => member.id === billing.buddy4.id), "name search matches");
+
+  const unverified = await api("GET", "/api/admin/users?verified=false", { token: session.token });
+  assert(unverified.body.data.items.every((member) => member.verified === false), "verified filter");
+  assert(unverified.body.data.pages >= 1, "pagination metadata");
+});
+
+await check("suspend blocks login and live tokens until reinstated", async () => {
+  const suspended = await api("POST", `/api/admin/users/${billing.buddy3.id}/suspend`, {
+    token: session.token,
+    body: { note: "Spamming likes" },
+  });
+  assertEqual(suspended.status, 200, "status");
+  assertEqual(suspended.body.data.accountStatus, "SUSPENDED", "account status");
+  assertEqual(suspended.body.data.moderationNote, "Spamming likes", "note stored");
+
+  const stale = await api("GET", "/api/auth/me", { token: billing.buddy3.token });
+  assertEqual(stale.status, 403, "live token refused");
+  assertEqual(stale.body.code, "ACCOUNT_SUSPENDED", "code");
+
+  const login = await api("POST", "/api/auth/login", {
+    body: { email: billing.buddy3.email, password },
+  });
+  assertEqual(login.status, 403, "login refused");
+  assertEqual(login.body.code, "ACCOUNT_SUSPENDED", "code");
+
+  const reinstated = await api("POST", `/api/admin/users/${billing.buddy3.id}/reinstate`, {
+    token: session.token,
+  });
+  assertEqual(reinstated.body.data.accountStatus, "OK", "reinstated");
+
+  const back = await api("POST", "/api/auth/login", {
+    body: { email: billing.buddy3.email, password },
+  });
+  assertEqual(back.status, 200, "login works again");
+  billing.buddy3.token = back.body.data.token;
+});
+
+await check("ban is enforced everywhere until an admin lifts it", async () => {
+  const banned = await api("POST", `/api/admin/users/${billing.buddy3.id}/ban`, {
+    token: session.token,
+    body: { note: "Repeat offender" },
+  });
+  assertEqual(banned.body.data.accountStatus, "BANNED", "banned");
+
+  const stale = await api("GET", "/api/auth/me", { token: billing.buddy3.token });
+  assertEqual(stale.body.code, "ACCOUNT_BANNED", "token refused");
+
+  const login = await api("POST", "/api/auth/login", {
+    body: { email: billing.buddy3.email, password },
+  });
+  assertEqual(login.body.code, "ACCOUNT_BANNED", "login refused");
+});
+
+await check("verification and featuring reach discover cards", async () => {
+  admin.viewer = await registerOnboard({
+    name: "Smoke Viewer", gender: "WOMAN", birthDate: "1995-05-05", city: "Accra",
+    interestedIn: ["MAN"], minAge: 25, maxAge: 45,
+  });
+
+  const verified = await api("POST", `/api/admin/users/${billing.buddy4.id}/verify`, {
+    token: session.token,
+    body: { verified: true },
+  });
+  assertEqual(verified.body.data.verified, true, "verified");
+
+  const featured = await api("POST", `/api/admin/users/${billing.buddy4.id}/feature`, {
+    token: session.token,
+    body: { featured: true },
+  });
+  assert(featured.body.data.featuredAt, "featured timestamp set");
+
+  const search = await api("GET", "/api/discover/search?q=Fourth", { token: admin.viewer.token });
+  const card = search.body.data.items.find((item) => item.id === billing.buddy4.id);
+  assert(card, "buddy4 is discoverable by the fresh viewer");
+  assertEqual(card.badge, "FEATURED", "featured badge wins over VIP");
+});
+
+await check("admins review reports and apply the resolution", async () => {
+  const reported = await api("POST", `/api/users/${billing.buddy4.id}/report`, {
+    token: admin.viewer.token,
+    body: { reason: "SPAM", details: "Crypto spam in the bio" },
+  });
+  assertEqual(reported.status, 201, "report filed");
+
+  const open = await api("GET", "/api/admin/reports?status=OPEN", { token: session.token });
+  const row = open.body.data.items.find((item) => item.target.id === billing.buddy4.id);
+  assert(row, "report listed for review");
+  assertEqual(row.target.fullName, "Smoke Fourth", "target joined");
+  assertEqual(row.reporter.id, admin.viewer.id, "reporter joined");
+
+  const warned = await api("POST", `/api/admin/reports/${row.id}/resolve`, {
+    token: session.token,
+    body: { resolution: "warned", note: "First offence" },
+  });
+  assertEqual(warned.body.data.status, "RESOLVED", "resolved");
+  assertEqual(warned.body.data.resolution, "WARNED", "resolution uppercased");
+  assertEqual(warned.body.data.resolvedBy.id, session.id, "resolver recorded");
+
+  const twice = await api("POST", `/api/admin/reports/${row.id}/resolve`, {
+    token: session.token,
+    body: { resolution: "DISMISSED" },
+  });
+  assertEqual(twice.status, 409, "cannot resolve twice");
+
+  await api("POST", `/api/users/${billing.buddy4.id}/report`, {
+    token: admin.viewer.token,
+    body: { reason: "HARASSMENT" },
+  });
+  const openAgain = await api("GET", "/api/admin/reports?status=OPEN", { token: session.token });
+  const second = openAgain.body.data.items.find(
+    (item) => item.target.id === billing.buddy4.id && item.reason === "HARASSMENT",
+  );
+  const harsh = await api("POST", `/api/admin/reports/${second.id}/resolve`, {
+    token: session.token,
+    body: { resolution: "SUSPENDED", note: "Second offence" },
+  });
+  assertEqual(harsh.status, 200, "resolved with sanction");
+
+  const member = await api("GET", `/api/admin/users/${billing.buddy4.id}`, { token: session.token });
+  assertEqual(member.body.data.accountStatus, "SUSPENDED", "sanction applied to the target");
+  assert(member.body.data.reports.length >= 2, "member detail includes their reports");
+});
+
+await check("admins manage the interest catalogue", async () => {
+  const created = await api("POST", "/api/admin/interests", {
+    token: session.token,
+    body: { label: "Afrobeats", emoji: "🥁", category: "Creative" },
+  });
+  assertEqual(created.status, 201, "created");
+  assertEqual(created.body.data.slug, "afrobeats", "slug generated");
+
+  const catalogue = await api("GET", "/api/profile/catalogue");
+  assert(catalogue.body.data.interests.some((entry) => entry.slug === "afrobeats"), "pickers see it");
+
+  const off = await api("PATCH", "/api/admin/interests/afrobeats", {
+    token: session.token,
+    body: { active: false },
+  });
+  assertEqual(off.body.data.active, false, "deactivated");
+
+  const hidden = await api("GET", "/api/profile/catalogue");
+  assert(!hidden.body.data.interests.some((entry) => entry.slug === "afrobeats"), "hidden from pickers");
+
+  const deleted = await api("DELETE", "/api/admin/interests/afrobeats", { token: session.token });
+  assertEqual(deleted.status, 200, "unused interest deleted");
+
+  const inUse = await api("DELETE", "/api/admin/interests/coffee", { token: session.token });
+  assertEqual(inUse.status, 409, "in-use interests are protected");
+});
+
+await check("admins manage subscriptions and the payments ledger", async () => {
+  const checkout = await api("POST", "/api/billing/checkout", {
+    token: session.token,
+    body: { plan: "PREMIUM", channel: "card" },
+  });
+  assertEqual(checkout.status, 201, "checkout");
+  await api("POST", "/api/billing/mock-pay", {
+    token: session.token,
+    body: { reference: checkout.body.data.reference },
+  });
+  const live = await api("POST", "/api/billing/verify", {
+    token: session.token,
+    body: { reference: checkout.body.data.reference },
+  });
+  assertEqual(live.body.data.active, true, "premium active again");
+
+  const ledger = await api("GET", "/api/admin/subscriptions?status=ACTIVE", { token: session.token });
+  const row = ledger.body.data.items.find((item) => item.reference === checkout.body.data.reference);
+  assert(row, "the payment shows in the ledger");
+  assertEqual(row.plan, "PREMIUM", "plan");
+  assertEqual(row.amountGhs, 49, "amount in GHS");
+  assert(row.user.email, "payer attached");
+
+  const terminated = await api("POST", `/api/admin/subscriptions/${row.id}/terminate`, {
+    token: session.token,
+  });
+  assertEqual(terminated.body.data.status, "EXPIRED", "terminated");
+
+  const plans = await api("GET", "/api/billing/plans", { token: session.token });
+  assertEqual(plans.body.data.plan, "FREE", "perks revoked immediately");
+
+  const twice = await api("POST", `/api/admin/subscriptions/${row.id}/terminate`, {
+    token: session.token,
+  });
+  assertEqual(twice.status, 409, "cannot terminate twice");
+});
+
+await check("announcements broadcast to every member", async () => {
+  const sent = await api("POST", "/api/admin/announcements", {
+    token: session.token,
+    body: { title: "Safety week", body: "New reporting tools are live - here is how to use them well." },
+  });
+  assertEqual(sent.status, 201, "sent");
+  assert(sent.body.data.deliveredTo >= 2, `delivered to ${sent.body.data.deliveredTo} members`);
+
+  const inbox = await api("GET", "/api/notifications?limit=10", { token: admin.viewer.token });
+  const announcement = inbox.body.data.items.find((item) => item.type === "ANNOUNCEMENT");
+  assert(announcement, "a member received the announcement");
+  assertEqual(announcement.payload.title, "Safety week", "payload carries the title");
+
+  const history = await api("GET", "/api/admin/announcements", { token: session.token });
+  assertEqual(history.body.data.items[0].title, "Safety week", "announcement history");
+});
+
+await check("roles can be delegated - and you cannot demote yourself", async () => {
+  const promoted = await api("POST", `/api/admin/users/${admin.viewer.id}/role`, {
+    token: session.token,
+    body: { role: "MODERATOR" },
+  });
+  assertEqual(promoted.body.data.role, "MODERATOR", "promoted");
+
+  const modAccess = await api("GET", "/api/admin/reports", { token: admin.viewer.token });
+  assertEqual(modAccess.status, 200, "moderators reach the panel");
+
+  const self = await api("POST", `/api/admin/users/${session.id}/role`, {
+    token: session.token,
+    body: { role: "USER" },
+  });
+  assertEqual(self.status, 422, "self-demotion refused");
+
+  const demoted = await api("POST", `/api/admin/users/${admin.viewer.id}/role`, {
+    token: session.token,
+    body: { role: "USER" },
+  });
+  assertEqual(demoted.body.data.role, "USER", "demoted");
+
+  const lockedOut = await api("GET", "/api/admin/stats", { token: admin.viewer.token });
+  assertEqual(lockedOut.status, 403, "panel access revoked");
+});
+
 /* ── other modules stay honest ─────────────────────────────────────────── */
 await check("unmigrated modules answer 501 instead of crashing", async () => {
   const { status, body } = await api("GET", "/api/status/feed", { token: session.token });
   assertEqual(status, 501, "status");
   assertEqual(body.code, "MODULE_NOT_MIGRATED", "code");
+
+  // admin has migrated: it must demand credentials, not answer 501
+  const adminNow = await api("GET", "/api/admin/stats");
+  assertEqual(adminNow.status, 401, "admin is a real module now");
 });
 
 await check("unknown API routes answer 404 JSON", async () => {

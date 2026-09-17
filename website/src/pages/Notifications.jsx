@@ -7,10 +7,15 @@ import { Card, CardBody } from '../components/ui/Card'
 import { api } from '../lib/api'
 import { timeAgo } from '../lib/format'
 
-const ICONS = { LIKE: '♥', MATCH: '💘', MESSAGE: '💬' }
+const ICONS = { LIKE: '♥', MATCH: '💘', MESSAGE: '💬', ANNOUNCEMENT: '📣' }
 
 function textFor(notification) {
   const who = notification.actor?.name || 'Someone'
+  if (notification.type === 'ANNOUNCEMENT') {
+    const title = notification.payload?.title || 'Announcement'
+    const body = notification.payload?.body
+    return body ? `${title} - ${body}` : title
+  }
   if (notification.type === 'LIKE') return `${who} liked you.`
   if (notification.type === 'MATCH') return `You matched with ${who}!`
   const preview = notification.payload?.preview
@@ -42,7 +47,9 @@ export function Notifications() {
       api.notifications.readOne(notification.id).catch(() => {})
       window.dispatchEvent(new window.Event('streetmeet:notifications'))
     }
-    if (notification.type === 'LIKE') navigate('/discover')
+    if (notification.type === 'ANNOUNCEMENT') {
+      /* announcements are read in place - nothing to open */
+    } else if (notification.type === 'LIKE') navigate('/discover')
     else if (notification.matchId) navigate(`/matches/${notification.matchId}`)
     else navigate('/matches')
     setData((current) => ({

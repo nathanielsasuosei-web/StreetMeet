@@ -92,6 +92,18 @@ export async function login({ email, password }) {
     });
   }
 
+  if (user.accountStatus === "SUSPENDED") {
+    throw new ApiError(403, "This account is suspended. Contact support if you think this is a mistake.", {
+      code: "ACCOUNT_SUSPENDED",
+    });
+  }
+
+  if (user.accountStatus === "BANNED") {
+    throw new ApiError(403, "This account has been banned for violating our community rules.", {
+      code: "ACCOUNT_BANNED",
+    });
+  }
+
   await users.touchLogin(user.id);
   const fresh = await users.findById(user.id);
   const bundle = await loadProfileBundle(fresh);

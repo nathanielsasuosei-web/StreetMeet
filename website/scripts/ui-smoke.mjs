@@ -791,6 +791,61 @@ await check('signing out returns to the public home page', () => {
   assertText(text(), 'Create your account', 'signed-out CTA')
 })
 
+/* ── module 4: admin control panel ───────────────────────────────────────── */
+await check('staff sign in and land on the admin control panel', async () => {
+  requests.length = 0
+  window.history.pushState({}, '', '/login')
+  window.dispatchEvent(new window.PopStateEvent('popstate'))
+  await waitFor(() => Boolean($('#login-email')), { label: 'login form' })
+
+  await fill('#login-email', 'nana@streetmeet.dev')
+  await fill('#login-password', 'Street1234')
+  await submitForm('Log in')
+
+  await waitFor(() => Boolean(byText('a.nav-link', 'Admin')), { label: 'admin nav link' })
+  await click(byText('a.nav-link', 'Admin'), 'admin link')
+  await waitFor(() => text().includes('Admin control panel'), { label: 'admin page' })
+  await waitFor(() => text().includes('Revenue') && text().includes('Open reports'), {
+    label: 'statistics tiles',
+  })
+  assert(
+    requests.some((r) => r.path === '/api/admin/stats' && r.status === 200),
+    'the stats endpoint served the panel',
+  )
+})
+
+await check('the members tab searches, suspends and reinstates', async () => {
+  await click(byText('button.segmented-item', 'Members'), 'members tab')
+  await waitFor(() => Boolean($('input[placeholder="Search name, email or city"]')), {
+    label: 'member search input',
+  })
+
+  await fill('input[placeholder="Search name, email or city"]', 'Ama')
+  await click(byText('button', 'Search'), 'member search button')
+  await waitFor(() => text().includes('ama@streetmeet.dev'), { label: 'search result' })
+
+  await click(byText('button', 'Suspend'), 'suspend button')
+  await waitFor(() => text().includes('SUSPENDED'), { label: 'suspended badge' })
+
+  await click(byText('button', 'Reinstate'), 'reinstate button')
+  await waitFor(() => !text().includes('SUSPENDED'), { label: 'account reinstated' })
+})
+
+await check('the moderation tabs render reports, payments, interests and announcements', async () => {
+  await click(byText('button.segmented-item', 'Reports'), 'reports tab')
+  await waitFor(() => text().includes('Reported accounts'), { label: 'reports tab' })
+
+  await click(byText('button.segmented-item', 'Subscriptions & payments'), 'payments tab')
+  await waitFor(() => text().includes('Every Paystack charge'), { label: 'payments tab' })
+
+  await click(byText('button.segmented-item', 'Interests'), 'interests tab')
+  await waitFor(() => text().includes('Dating categories'), { label: 'interests tab' })
+  await waitFor(() => text().includes('Coffee'), { label: 'catalogue loaded from the API' })
+
+  await click(byText('button.segmented-item', 'Announcements'), 'announcements tab')
+  await waitFor(() => text().includes('Send announcement'), { label: 'announcements tab' })
+})
+
 await check('no unexpected React errors were logged', () => {
   const serious = consoleErrors.filter(
     (line) =>

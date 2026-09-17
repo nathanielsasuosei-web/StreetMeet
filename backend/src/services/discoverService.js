@@ -63,6 +63,7 @@ async function candidateRows(userId, { filters = {}, fetchLimit } = {}) {
   const where = [
     "u.id <> ?",
     "u.deactivated_at IS NULL",
+    "u.account_status = 'OK'",
     "u.gender IS NOT NULL",
     "u.birth_date IS NOT NULL",
     "s.discoverable = 1",
@@ -111,12 +112,13 @@ async function candidateRows(userId, { filters = {}, fetchLimit } = {}) {
             p.interested_in, p.min_age, p.max_age,
             (EXISTS (SELECT 1 FROM subscriptions x
                       WHERE x.user_id = u.id AND x.status = 'ACTIVE'
-                        AND x.expires_at > ? AND x.plan = 'VIP')) AS is_vip
+                        AND x.expires_at > ? AND x.plan = 'VIP')) AS is_vip,
+            (u.featured_at IS NOT NULL) AS is_featured
        FROM users u
        JOIN dating_preferences p ON p.user_id = u.id
        JOIN account_settings s ON s.user_id = u.id
       WHERE ${where.join(" AND ")}
-      ORDER BY is_vip DESC, u.created_at DESC
+      ORDER BY is_featured DESC, is_vip DESC, u.created_at DESC
       LIMIT ?`,
     [nowIso, ...params, fetchLimit],
   );
@@ -207,6 +209,7 @@ export async function likesYou(userId) {
             (EXISTS (SELECT 1 FROM subscriptions x
                       WHERE x.user_id = u.id AND x.status = 'ACTIVE'
                         AND x.expires_at > ? AND x.plan = 'VIP')) AS is_vip,
+            (u.featured_at IS NOT NULL) AS is_featured,
             l.created_at AS liked_at
        FROM likes l
        JOIN users u ON u.id = l.sender_id
@@ -214,6 +217,7 @@ export async function likesYou(userId) {
        LEFT JOIN dating_preferences p ON p.user_id = u.id
       WHERE l.receiver_id = ? AND l.decision = 'LIKE'
         AND u.deactivated_at IS NULL
+        AND u.account_status = 'OK'
         AND s.profile_visibility <> 'PRIVATE'
         AND NOT EXISTS (SELECT 1 FROM likes m WHERE m.sender_id = ? AND m.receiver_id = u.id)
         AND NOT EXISTS (SELECT 1 FROM matches m

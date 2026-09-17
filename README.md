@@ -19,16 +19,17 @@ scripts/   Repo-level tooling (runs both apps together)
 | 3 | Chat & messaging | 🚧 Not migrated |
 | 4 | Status updates | 🚧 Not migrated |
 | 5 | **Premium & payments (subscriptions)** | ✅ **Rebuilt** - Free/Premium/VIP plans, Paystack checkout with Ghana Mobile Money + cards, auto-activation, expiry - see [docs/SUBSCRIPTIONS.md](docs/SUBSCRIPTIONS.md) |
-| 6 | Admin & moderation | 🚧 Not migrated |
+| 6 | **Admin & moderation (control panel)** | ✅ **Rebuilt** - member directory & search, suspend/ban, verification, report review, subscription & payment management, interest catalogue, announcements, statistics, featured profiles - see [docs/ADMIN_PANEL.md](docs/ADMIN_PANEL.md) |
 
 Module 1 is documented in detail in **[docs/USER_ACCOUNTS.md](docs/USER_ACCOUNTS.md)**,
-module 2 in **[docs/DATING_FEATURES.md](docs/DATING_FEATURES.md)** and the subscriptions/payments
-rebuild in **[docs/SUBSCRIPTIONS.md](docs/SUBSCRIPTIONS.md)**.
+module 2 in **[docs/DATING_FEATURES.md](docs/DATING_FEATURES.md)**, the subscriptions/payments
+rebuild in **[docs/SUBSCRIPTIONS.md](docs/SUBSCRIPTIONS.md)** and the admin control panel in
+**[docs/ADMIN_PANEL.md](docs/ADMIN_PANEL.md)**.
 
-The older modules are still in the repository untouched. They were written against a Prisma client
-that this environment cannot download engines for, and one of them (`admin`) imports files
-that do not exist, so it is mounted behind a guard that answers a clear `501` instead of crashing
-the API at boot. (The legacy `payments` stub was replaced by the rebuilt billing module.) See [backend/README.md](backend/README.md#legacy-modules).
+The last remaining legacy module (`status`) was written against a Prisma client that this
+environment cannot download engines for, so it is mounted behind a guard that answers a clear
+`501` instead of crashing the API at boot. (The legacy `payments` and `admin` stubs were replaced
+by the rebuilt billing and admin modules.) See [backend/README.md](backend/README.md#legacy-modules).
 
 ## Quickstart
 

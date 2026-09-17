@@ -2178,3 +2178,154 @@ input[type='range']::-moz-range-thumb {
 .read-receipt { color: var(--accent); font-weight: 700; }
 
 .btn-sm { padding: 6px 12px; font-size: 0.82rem; }
+
+
+/* ===================== Admin control panel ===================== */
+.admin-tabs { margin-bottom: 16px; flex-wrap: wrap; }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+@media (max-width: 900px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.stat-tile {
+  display: grid;
+  gap: 2px;
+  padding: 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.stat-value { font-size: 1.7rem; font-weight: 800; color: var(--ink); }
+.stat-tile strong { font-size: 0.82rem; color: var(--ink-2); }
+
+.admin-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+@media (max-width: 900px) {
+  .admin-charts { grid-template-columns: 1fr; }
+}
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 120px;
+}
+.bar-slot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+}
+.bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--surface)));
+}
+
+.admin-columns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+@media (max-width: 1000px) {
+  .admin-columns { grid-template-columns: 1fr; }
+}
+
+.admin-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.admin-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.admin-toolbar .input,
+.admin-toolbar .select { flex: 1; min-width: 160px; }
+.admin-emoji-input { max-width: 90px !important; flex: 0 0 auto !important; }
+
+.admin-members { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.admin-member {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  flex-wrap: wrap;
+}
+.admin-member-main {
+  display: grid;
+  gap: 3px;
+  flex: 1;
+  min-width: 200px;
+}
+.admin-member-badges { gap: 6px; flex-wrap: wrap; }
+.admin-member-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.admin-member-actions .select { padding: 6px 8px; font-size: 0.8rem; }
+
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.admin-reports li,
+.admin-ledger li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.admin-report { display: block !important; }
+.admin-report-head { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+.admin-report-parties { margin: 0 0 4px; }
+.admin-report .admin-toolbar { margin: 8px 0 0; }
+.admin-ledger-main { display: grid; gap: 2px; flex: 1; min-width: 240px; }
+.admin-ledger code {
+  background: var(--surface-3);
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 0.74rem;
+}
+
+.admin-interests li { padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-md); }
+.interest-emoji { font-size: 1.2rem; }
+.interest-inactive { opacity: 0.55; }
+.admin-interest-actions { margin-left: auto; display: flex; gap: 6px; }
+
+.admin-announce-form { display: grid; gap: 12px; max-width: 640px; margin-bottom: 18px; }
+.admin-announcements li { display: block; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-md); }
+.admin-announcements p { margin: 4px 0; }
+
+.badge-danger { background: var(--danger-soft); color: var(--danger); }
+.badge-featured { background: linear-gradient(135deg, #7dd3fc, #2563eb); color: #08203f; }

@@ -116,12 +116,12 @@ PAYSTACK_CALLBACK_URL=          # optional override; defaults to CLIENT_URL/prem
 
 ## 8. Tests
 
-* `backend/scripts/smoke.js` — 56 checks total; the billing section covers the
+* `backend/scripts/smoke.js` — the billing section (10 of the suite's checks) covers the
   catalogue, 402 gating (advanced filters, likes-you, like budget with
   `BILLING_FREE_LIKE_LIMIT=2`), checkout validation, the mock
   approve → verify → activate path, perk unlocking, read receipts, a signed
   `charge.success` webhook activating VIP, and read-time expiry + sweeper.
-* `website/scripts/ui-smoke.mjs` — 37 checks total; the billing section walks
+* `website/scripts/ui-smoke.mjs` — the billing section (3 of the suite's checks) walks
   the plans page, completes a mobile-money checkout in mock mode and asserts
   the navbar/badge/history updates, then verifies the previously locked
   advanced filters now return `200`.

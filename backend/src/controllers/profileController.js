@@ -6,7 +6,7 @@ import * as profileService from "../services/profileService.js";
 import asyncHandler from "../utils/asyncHandler.js";
 
 export const catalogue = asyncHandler(async (_req, res) => {
-  res.json({ success: true, data: profileService.catalogue() });
+  res.json({ success: true, data: await profileService.catalogue() });
 });
 
 export const getMe = asyncHandler(async (req, res) => {

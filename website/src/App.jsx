@@ -21,6 +21,7 @@ import Messages from './pages/Messages'
 /* Modules 3-6: placeholders until they are rebuilt. */
 import Status from './pages/Status'
 import Premium from './pages/Premium'
+import Admin from './pages/Admin'
 
 import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
@@ -56,6 +57,7 @@ function App() {
             <Route path="/messages" element={<Messages />} />
             <Route path="/status" element={<Status />} />
             <Route path="/premium" element={<Premium />} />
+            <Route path="/admin" element={<Admin />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

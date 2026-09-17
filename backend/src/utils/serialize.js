@@ -120,6 +120,12 @@ export function toPublicProfile({ user, interests = [], settings = null, isMatch
  * because the dating queries return display columns plus the owner's
  * per-field privacy switches in one indexed round-trip.
  */
+function cardBadge(row) {
+  if (bool(row.is_featured)) return "FEATURED";
+  if (bool(row.is_vip)) return "VIP";
+  return null;
+}
+
 export function toDiscoverCard({ row, interests = [] }) {
   const showAge = bool(row.show_age, true);
   const showLocation = bool(row.show_location, true);
@@ -139,7 +145,7 @@ export function toDiscoverCard({ row, interests = [] }) {
     profileImage: row.profile_image,
     interests,
     relationshipGoal: row.relationship_goal ?? null,
-    badge: bool(row.is_vip) ? "VIP" : null,
+    badge: cardBadge(row),
   };
 }
 
