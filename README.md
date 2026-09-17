@@ -18,16 +18,17 @@ scripts/   Repo-level tooling (runs both apps together)
 | 2 | Dating (discover, match, message, moderate) | ✅ Rebuilt - see [docs/DATING_FEATURES.md](docs/DATING_FEATURES.md) |
 | 3 | Chat & messaging | 🚧 Not migrated |
 | 4 | Status updates | 🚧 Not migrated |
-| 5 | Premium & payments | 🚧 Not migrated |
+| 5 | **Premium & payments (subscriptions)** | ✅ **Rebuilt** - Free/Premium/VIP plans, Paystack checkout with Ghana Mobile Money + cards, auto-activation, expiry - see [docs/SUBSCRIPTIONS.md](docs/SUBSCRIPTIONS.md) |
 | 6 | Admin & moderation | 🚧 Not migrated |
 
 Module 1 is documented in detail in **[docs/USER_ACCOUNTS.md](docs/USER_ACCOUNTS.md)**,
-module 2 in **[docs/DATING_FEATURES.md](docs/DATING_FEATURES.md)**.
+module 2 in **[docs/DATING_FEATURES.md](docs/DATING_FEATURES.md)** and the subscriptions/payments
+rebuild in **[docs/SUBSCRIPTIONS.md](docs/SUBSCRIPTIONS.md)**.
 
 The older modules are still in the repository untouched. They were written against a Prisma client
-that this environment cannot download engines for, and two of them (`payments`, `admin`) import files
-that do not exist, so they are mounted behind a guard that answers a clear `501` instead of crashing
-the API at boot. See [backend/README.md](backend/README.md#legacy-modules).
+that this environment cannot download engines for, and one of them (`admin`) imports files
+that do not exist, so it is mounted behind a guard that answers a clear `501` instead of crashing
+the API at boot. (The legacy `payments` stub was replaced by the rebuilt billing module.) See [backend/README.md](backend/README.md#legacy-modules).
 
 ## Quickstart
 

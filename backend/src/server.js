@@ -11,6 +11,7 @@ import { createApp } from "./app.js";
 import { env } from "./config/env.js";
 import db, { closeDb } from "./db/index.js";
 import { migrate } from "./db/migrate.js";
+import { sweepExpired } from "./services/billingService.js";
 
 async function boot() {
   fs.mkdirSync(env.uploads.profilesDir, { recursive: true });
@@ -42,8 +43,22 @@ async function boot() {
     console.log(`   client:  ${env.clientUrl}`);
   });
 
+  // Subscriptions expire on read anyway; this keeps the rows honest.
+  const sweep = async () => {
+    try {
+      const flipped = await sweepExpired();
+      if (flipped) console.log(`   ⏳ expired ${flipped} subscription(s)`);
+    } catch (error) {
+      console.warn("subscription sweep failed:", error.message);
+    }
+  };
+  await sweep();
+  const sweeper = setInterval(sweep, 60 * 60 * 1000);
+  sweeper.unref?.();
+
   const shutdown = async (signal) => {
     console.log(`\n${signal} received - shutting down.`);
+    clearInterval(sweeper);
     server.close(async () => {
       await closeDb();
       process.exit(0);

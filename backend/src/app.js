@@ -12,6 +12,7 @@ import { env } from "./config/env.js";
 import db from "./db/index.js";
 
 import authRoutes from "./routes/authRoutes.js";
+import billingRoutes from "./routes/billingRoutes.js";
 import discoverRoutes from "./routes/discoverRoutes.js";
 import matchRoutes from "./routes/matchRoutes.js";
 import moderationRoutes from "./routes/moderationRoutes.js";
@@ -31,7 +32,6 @@ import { apiLimiter } from "./middleware/rateLimiters.js";
  */
 const LEGACY_MODULES = [
   { mount: "/api/status", name: "status", file: "./routes/statusRoutes.js" },
-  { mount: "/api/payment", name: "payments", file: "./routes/paymentRoutes.js" },
   { mount: "/api/admin", name: "admin", file: "./routes/adminRoutes.js" },
 ];
 
@@ -91,7 +91,7 @@ export async function createApp() {
     })
   );
 
-  app.use(express.json({ limit: "1mb" }));
+  app.use(express.json({ limit: "1mb", verify: (req, _res, buf) => { req.rawBody = buf.toString("utf8"); } }));
   app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
   if (env.logRequests) {
@@ -167,6 +167,7 @@ export async function createApp() {
   app.use("/api/swipes", swipeRoutes);
   app.use("/api/matches", matchRoutes);
   app.use("/api/notifications", notificationRoutes);
+  app.use("/api/billing", billingRoutes);
   app.use("/api", moderationRoutes); // /users/:id/block|report, /blocks
 
   /* ── Modules 2-6: guarded until they are rebuilt ─────────────────────── */

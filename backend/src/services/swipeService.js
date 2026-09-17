@@ -13,6 +13,7 @@ import * as notificationRepository from "../repositories/notificationRepository.
 import * as settingsRepository from "../repositories/settingsRepository.js";
 import * as swipeRepository from "../repositories/swipeRepository.js";
 import * as userRepository from "../repositories/userRepository.js";
+import * as planService from "./planService.js";
 import { ApiError } from "../utils/apiError.js";
 
 async function loadTarget(userId, targetId) {
@@ -27,6 +28,10 @@ async function loadTarget(userId, targetId) {
 }
 
 export async function swipe(userId, { targetId, decision }) {
+  if (decision === "LIKE") {
+    await planService.assertLikeAllowed(userId);
+  }
+
   await loadTarget(userId, targetId);
 
   if (await swipeRepository.findSwipe(userId, targetId)) {

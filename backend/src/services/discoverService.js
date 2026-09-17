@@ -19,6 +19,7 @@ import {
 } from "../repositories/profileRepository.js";
 import { listSwipedIds } from "../repositories/swipeRepository.js";
 import * as userRepository from "../repositories/userRepository.js";
+import * as planService from "./planService.js";
 import { ageFrom, birthDateWindow } from "../utils/age.js";
 import { ApiError } from "../utils/apiError.js";
 import { jsonList } from "../db/normalize.js";
@@ -58,6 +59,7 @@ async function myContext(userId) {
 
 /** Candidate rows with every exclusion pushed into SQL. */
 async function candidateRows(userId, { filters = {}, fetchLimit } = {}) {
+  const nowIso = new Date().toISOString();
   const where = [
     "u.id <> ?",
     "u.deactivated_at IS NULL",
@@ -77,6 +79,12 @@ async function candidateRows(userId, { filters = {}, fetchLimit } = {}) {
     where.push("u.birth_date BETWEEN ? AND ?");
     params.push(window.oldest, window.youngest);
   }
+  // advanced filters are a paid perk; basic ones stay free
+  const advancedRequested = Boolean(filters.interests?.length || filters.goal);
+  if (advancedRequested) {
+    await planService.requirePerk(userId, "advancedFilters");
+  }
+
   if (filters.interests?.length) {
     where.push(
       `EXISTS (SELECT 1 FROM user_interests ui
@@ -100,14 +108,17 @@ async function candidateRows(userId, { filters = {}, fetchLimit } = {}) {
   return db.all(
     `SELECT u.id, u.full_name, u.gender, u.birth_date, u.bio, u.city, u.country,
             u.profile_image, s.show_age, s.show_location, p.relationship_goal,
-            p.interested_in, p.min_age, p.max_age
+            p.interested_in, p.min_age, p.max_age,
+            (EXISTS (SELECT 1 FROM subscriptions x
+                      WHERE x.user_id = u.id AND x.status = 'ACTIVE'
+                        AND x.expires_at > ? AND x.plan = 'VIP')) AS is_vip
        FROM users u
        JOIN dating_preferences p ON p.user_id = u.id
        JOIN account_settings s ON s.user_id = u.id
       WHERE ${where.join(" AND ")}
-      ORDER BY u.created_at DESC
+      ORDER BY is_vip DESC, u.created_at DESC
       LIMIT ?`,
-    [...params, fetchLimit],
+    [nowIso, ...params, fetchLimit],
   );
 }
 
@@ -181,6 +192,41 @@ export async function search(userId, filters = {}) {
     offset,
     limit,
   };
+}
+
+/**
+ * VIP: members who already liked me and I have not decided on yet.
+ * Same privacy and safety exclusions as the deck.
+ */
+export async function likesYou(userId) {
+  await planService.requirePerk(userId, "likesYou");
+  const nowIso = new Date().toISOString();
+  const rows = await db.all(
+    `SELECT u.id, u.full_name, u.gender, u.birth_date, u.bio, u.city, u.country,
+            u.profile_image, s.show_age, s.show_location, p.relationship_goal,
+            (EXISTS (SELECT 1 FROM subscriptions x
+                      WHERE x.user_id = u.id AND x.status = 'ACTIVE'
+                        AND x.expires_at > ? AND x.plan = 'VIP')) AS is_vip,
+            l.created_at AS liked_at
+       FROM likes l
+       JOIN users u ON u.id = l.sender_id
+       JOIN account_settings s ON s.user_id = u.id
+       LEFT JOIN dating_preferences p ON p.user_id = u.id
+      WHERE l.receiver_id = ? AND l.decision = 'LIKE'
+        AND u.deactivated_at IS NULL
+        AND s.profile_visibility <> 'PRIVATE'
+        AND NOT EXISTS (SELECT 1 FROM likes m WHERE m.sender_id = ? AND m.receiver_id = u.id)
+        AND NOT EXISTS (SELECT 1 FROM matches m
+                         WHERE (m.user_one_id = ? AND m.user_two_id = u.id)
+                            OR (m.user_two_id = ? AND m.user_one_id = u.id))
+        AND NOT EXISTS (SELECT 1 FROM blocks b
+                         WHERE (b.blocker_id = ? AND b.blocked_user_id = u.id)
+                            OR (b.blocker_id = u.id AND b.blocked_user_id = ?))
+      ORDER BY l.created_at DESC
+      LIMIT 24`,
+    [nowIso, userId, userId, userId, userId, userId, userId],
+  );
+  return { items: await toCards(rows) };
 }
 
 export const SEARCH_GENDERS = GENDER_VALUES;

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../hooks/useAuth'
+import { usePlan } from '../hooks/usePlan'
 import { NotificationBell } from './NotificationBell'
 import { Avatar } from './ui/Avatar'
 import { Button } from './ui/Button'
@@ -17,6 +18,7 @@ const APP_LINKS = [
 
 export function Navbar() {
   const { isAuthenticated, user, logout, profileComplete } = useAuth()
+  const { plan } = usePlan()
   const [menuOpen, setMenuOpen] = useState(false)
   const [linksOpen, setLinksOpen] = useState(false)
   const menuRef = useRef(null)
@@ -79,6 +81,7 @@ export function Navbar() {
         <div className="nav-actions">
           {isAuthenticated ? (
             <>
+              {plan && plan !== 'FREE' ? <span className={`plan-chip plan-chip-${plan.toLowerCase()}`}>{plan}</span> : null}
               <NotificationBell />
               {!profileComplete ? (
                 <Button size="sm" variant="accent" onClick={() => go('/onboarding')}>

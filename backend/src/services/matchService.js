@@ -11,6 +11,7 @@ import * as moderationRepository from "../repositories/moderationRepository.js";
 import * as notificationRepository from "../repositories/notificationRepository.js";
 import { listInterestsForMany } from "../repositories/profileRepository.js";
 import * as settingsRepository from "../repositories/settingsRepository.js";
+import * as planService from "./planService.js";
 import { ApiError } from "../utils/apiError.js";
 import { toDiscoverCard } from "../utils/serialize.js";
 
@@ -27,13 +28,14 @@ async function requireMembership(userId, matchId) {
   };
 }
 
-function toMessage(row, readerId) {
+function toMessage(row, readerId, { readReceipts = false } = {}) {
   return {
     id: row.id,
     matchId: row.match_id,
     mine: row.sender_id === readerId,
     content: row.content,
-    seen: bool(row.seen),
+    // "seen" is a Premium perk: free members send/read without receipts
+    seen: readReceipts ? bool(row.seen) : null,
     createdAt: iso(row.created_at),
   };
 }
@@ -94,10 +96,12 @@ export async function getMatch(userId, matchId) {
 /** Thread history, oldest -> newest, paginated backwards via `before`. */
 export async function getThread(userId, matchId, { before = null, limit = 50 } = {}) {
   await requireMembership(userId, matchId);
+  const { perks } = await planService.currentPlan(userId);
   const rows = await matchRepository.listThread(matchId, { before, limit });
   return {
-    items: rows.map((row) => toMessage(row, userId)),
+    items: rows.map((row) => toMessage(row, userId, { readReceipts: perks.readReceipts })),
     hasMore: rows.length === limit,
+    readReceipts: perks.readReceipts,
   };
 }
 
@@ -121,6 +125,7 @@ export async function sendMessage(userId, matchId, content) {
     });
   }
 
+  const { perks } = await planService.currentPlan(userId);
   const message = await db.transaction(async (tx) => {
     const row = await matchRepository.insertMessage(
       { matchId, senderId: userId, receiverId: partnerId, content: text },
@@ -141,7 +146,11 @@ export async function sendMessage(userId, matchId, content) {
     return row;
   });
 
-  return toMessage({ ...message, sender_id: message.senderId, match_id: matchId }, userId);
+  return toMessage(
+    { ...message, sender_id: message.senderId, match_id: matchId },
+    userId,
+    { readReceipts: perks.readReceipts },
+  );
 }
 
 /** Mark everything my partner sent in this thread as read. */

@@ -134,6 +134,15 @@ export const api = {
   discover: {
     deck: (limit) => request(withQuery('/api/discover/deck', { limit })),
     search: (params) => request(withQuery('/api/discover/search', params)),
+    likesYou: () => request('/api/discover/likes-you'),
+  },
+
+  billing: {
+    plans: () => request('/api/billing/plans'),
+    subscription: () => request('/api/billing/subscription'),
+    checkout: (payload) => request('/api/billing/checkout', { method: 'POST', body: payload }),
+    verify: (reference) => request('/api/billing/verify', { method: 'POST', body: { reference } }),
+    mockPay: (reference) => request('/api/billing/mock-pay', { method: 'POST', body: { reference } }),
   },
 
   swipes: {

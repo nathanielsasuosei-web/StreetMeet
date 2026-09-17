@@ -195,6 +195,7 @@ export function Conversation() {
               <p>{message.content}</p>
               <span className="tiny muted" title={formatDateTime(message.createdAt)}>
                 {formatDateTime(message.createdAt)}
+                {message.mine && message.seen === true ? <span className="read-receipt"> · Read</span> : null}
               </span>
             </div>
           </div>

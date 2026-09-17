@@ -9,6 +9,11 @@ export const getDeck = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
+export const likesYou = asyncHandler(async (req, res) => {
+  const data = await discoverService.likesYou(req.user.id);
+  res.json({ success: true, data });
+});
+
 export const searchProfiles = asyncHandler(async (req, res) => {
   const { genders, interests, minAge, maxAge, goal, location, q, limit, offset } = req.query;
   const data = await discoverService.search(req.user.id, {
@@ -25,4 +30,4 @@ export const searchProfiles = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
-export default { getDeck, searchProfiles };
+export default { getDeck, likesYou, searchProfiles };

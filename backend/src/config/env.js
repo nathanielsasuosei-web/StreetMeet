@@ -110,6 +110,15 @@ export const env = {
     maxDimension: int(process.env.UPLOAD_MAX_DIMENSION, 1000),
   },
 
+  paystack: {
+    /** No key = deterministic mock mode (dev, tests, demos). */
+    secret: process.env.PAYSTACK_SECRET_KEY || "",
+    mode: (process.env.PAYSTACK_MODE || (process.env.PAYSTACK_SECRET_KEY ? "live" : "mock")).toLowerCase(),
+    currency: process.env.PAYSTACK_CURRENCY || "GHS",
+    baseUrl: (process.env.PAYSTACK_BASE_URL || "https://api.paystack.co").replace(/\/$/, ""),
+    channels: list(process.env.PAYSTACK_CHANNELS || "mobile_money,card"),
+  },
+
   autoMigrate: bool(
     process.env.AUTO_MIGRATE,
     provider === "sqlite" && !isProd

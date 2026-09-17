@@ -23,6 +23,7 @@ export function ProfileCard({ card, actions, onOpen, compact = false }) {
           </span>
         )}
         <span className="profile-card-overlay">
+          {card.badge ? <span className="badge badge-vip">{card.badge}</span> : null}
           <strong>
             {card.firstName}
             {card.age ? `, ${card.age}` : ''}

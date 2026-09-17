@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { MatchModal } from '../components/MatchModal'
 import { ProfileCard } from '../components/ProfileCard'
 import { ReportDialog } from '../components/ReportDialog'
+import { Avatar } from '../components/ui/Avatar'
 import { Button } from '../components/ui/Button'
 import { Card, CardBody, CardHead } from '../components/ui/Card'
 import { Chip, ChipGroup } from '../components/ui/Chip'
@@ -11,6 +12,7 @@ import { Field, Select, TextInput } from '../components/ui/Field'
 import { Modal } from '../components/ui/Modal'
 import { useAuth } from '../hooks/useAuth'
 import { useCatalogue } from '../hooks/useCatalogue'
+import { usePlan } from '../hooks/usePlan'
 import { useToast } from '../hooks/useToast'
 import { api } from '../lib/api'
 import { labelFor } from '../lib/format'
@@ -32,6 +34,7 @@ const EMPTY_FILTERS = {
  */
 export function Discover() {
   const { user, profileComplete } = useAuth()
+  const { plan, perks, limits } = usePlan()
   const toast = useToast()
   const { interests: catalogueInterests, genders, relationshipGoals } = useCatalogue()
 
@@ -49,6 +52,8 @@ export function Discover() {
   const [blocking, setBlocking] = useState(null)
   const [match, setMatch] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [likesYou, setLikesYou] = useState(null)
+  const [planGate, setPlanGate] = useState(null)
 
   const loadDeck = useCallback(async () => {
     setDeckState('loading')
@@ -65,6 +70,25 @@ export function Discover() {
   useEffect(() => {
     if (profileComplete) loadDeck()
   }, [profileComplete, loadDeck])
+
+  useEffect(() => {
+    if (!perks.likesYou) {
+      setLikesYou(null)
+      return undefined
+    }
+    let active = true
+    api.discover
+      .likesYou()
+      .then((data) => {
+        if (active) setLikesYou(data.items)
+      })
+      .catch(() => {
+        if (active) setLikesYou([])
+      })
+    return () => {
+      active = false
+    }
+  }, [perks.likesYou])
 
   const card = mode === 'deck' ? (queue[index] ?? null) : null
 
@@ -83,7 +107,12 @@ export function Discover() {
       }
       if (viewing?.id === target.id) setViewing(null)
     } catch (cause) {
-      toast.error(cause?.message || 'Could not save your decision.')
+      if (cause?.code === 'LIKE_LIMIT_REACHED' || cause?.code === 'PLAN_REQUIRED') {
+        setPlanGate(cause.message)
+        toast.error(cause.message)
+      } else {
+        toast.error(cause?.message || 'Could not save your decision.')
+      }
     } finally {
       setBusy(false)
     }
@@ -105,7 +134,12 @@ export function Discover() {
       setResults(data.items)
       setSearchState('ready')
     } catch (cause) {
-      toast.error(cause?.message || 'Search failed.')
+      if (cause?.code === 'PLAN_REQUIRED') {
+        setPlanGate(cause.message)
+        toast.error(cause.message)
+      } else {
+        toast.error(cause?.message || 'Search failed.')
+      }
       setSearchState('ready')
     }
   }
@@ -181,6 +215,41 @@ export function Discover() {
         </div>
       </div>
 
+      {planGate ? (
+        <div className="perk-lock">
+          <span>🔒 {planGate}</span>
+          <Link className="btn btn-accent btn-sm" to="/premium">
+            See plans
+          </Link>
+        </div>
+      ) : null}
+
+      {mode === 'deck' && perks.likesYou && likesYou?.length ? (
+        <div className="likes-you">
+          <strong className="tiny">💘 Likes you</strong>
+          <div className="likes-you-row">
+            {likesYou.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="likes-you-item"
+                onClick={() => setViewing(item)}
+                title={`${item.fullName} liked you`}
+              >
+                <Avatar src={item.profileImage} name={item.fullName} size="md" />
+                <span className="tiny">{item.firstName}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {mode === 'deck' && plan && !perks.likesYou ? (
+        <Link className="likes-you-teaser" to="/premium">
+          💘 Skip the guessing - see everyone who already liked you. <strong>VIP</strong>
+        </Link>
+      ) : null}
+
       {mode === 'deck' ? (
         <div className="discover-deck">
           {deckState === 'loading' ? <p className="muted">Loading profiles…</p> : null}
@@ -249,6 +318,9 @@ export function Discover() {
               <p className="tiny muted" style={{ textAlign: 'center' }}>
                 {queue.length - index} profile{queue.length - index === 1 ? '' : 's'} left in this
                 batch
+                {!perks.unlimitedLikes && limits.freeLikesPerDay
+                  ? ` · free plan: ${limits.freeLikesPerDay} likes/day`
+                  : ''}
               </p>
             </>
           ) : null}
@@ -321,6 +393,12 @@ export function Discover() {
                   />
                 </Field>
               </div>
+              {!perks.advancedFilters ? (
+                <p className="perk-lock tiny">
+                  🔒 Interests, goal and keyword filters are Premium.{' '}
+                  <Link to="/premium">Upgrade</Link>
+                </p>
+              ) : null}
               <Field label="Shared interests">
                 <div className="filter-interests">
                   <ChipGroup

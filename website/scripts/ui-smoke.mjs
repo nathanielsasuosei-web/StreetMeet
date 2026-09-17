@@ -694,6 +694,63 @@ await check('search filters exclude people outside the filters', async () => {
   assert(empty, 'the location filter should exclude the Accra buddy')
 })
 
+/* ── module 3: plans & paystack (mock) checkout ────────────────────────── */
+await check('the plans page lists the three tiers with the free plan active', async () => {
+  window.history.pushState({}, '', '/premium')
+  window.dispatchEvent(new window.PopStateEvent('popstate'))
+
+  await waitFor(() => text().includes('Plans & billing'), { label: 'plans page' })
+  assert(
+    requests.some((r) => r.path === '/api/billing/plans' && r.status === 200),
+    'the plans endpoint was called (cached module-scoped, once per run)',
+  )
+  assert(text().includes('Current plan: FREE'), 'free plan badge')
+  assert(text().includes('Choose Premium'), 'premium CTA')
+  assert(text().includes('Choose VIP'), 'vip CTA')
+})
+
+await check('checking out with mobile money upgrades the account (mock Paystack)', async () => {
+  await click(byText('button', 'Choose Premium'), 'premium CTA')
+  await waitFor(() => text().includes('Payment channel'), { label: 'checkout form' })
+
+  await fill('input[placeholder="0244 000 000"]', '0244000000')
+  await click(byText('button', 'Start payment'), 'start payment')
+  await waitFor(() => text().includes('Reference'), { label: 'mock approval step' })
+  await click(byText('button', 'Simulate approval'), 'simulate approval')
+
+  await waitFor(() => text().includes('is live'), { label: 'activation toast', timeout: 6000 })
+  await waitFor(() => text().includes('Current plan: PREMIUM'), { label: 'premium badge' })
+  await waitFor(() => text().includes('Active subscription'), { label: 'subscription card' })
+  assert(text().includes('PREMIUM'), 'plan chip shows in the shell')
+})
+
+await check('premium unlocks the advanced filters in discover', async () => {
+  requests.length = 0
+  window.history.pushState({}, '', '/discover')
+  window.dispatchEvent(new window.PopStateEvent('popstate'))
+
+  await waitFor(() => Boolean(byText('button.segmented-item', 'Search & filters')), {
+    label: 'search mode toggle',
+  })
+  await click(byText('button.segmented-item', 'Search & filters'), 'search mode')
+  await waitFor(() => text().includes('Shared interests'), { label: 'filters card' })
+
+  const interestBox = $$('.field').find((box) => box.textContent.includes('Shared interests'))
+  await click(interestBox.querySelector('button'), 'interest chip')
+  await click(byText('button', 'Search profiles'), 'search button')
+
+  await waitFor(
+    () =>
+      requests.some(
+        (r) =>
+          r.path.startsWith('/api/discover/search') &&
+          r.path.includes('interests=') &&
+          r.status === 200,
+      ),
+    { label: 'premium search request' },
+  )
+})
+
 /* leave the database as we found it: delete the account this run created */
 await check('the account created by this test run can delete itself', async () => {
   const token = window.localStorage.getItem('streetmeet.token')

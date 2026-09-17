@@ -139,6 +139,7 @@ export function toDiscoverCard({ row, interests = [] }) {
     profileImage: row.profile_image,
     interests,
     relationshipGoal: row.relationship_goal ?? null,
+    badge: bool(row.is_vip) ? "VIP" : null,
   };
 }
 

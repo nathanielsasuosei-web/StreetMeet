@@ -25,6 +25,7 @@ process.env.LOG_REQUESTS = "false";
 process.env.JWT_SECRET = "smoke-test-secret-0123456789abcdef0123456789abcdef";
 process.env.CLIENT_URL = "http://localhost:5173";
 process.env.UPLOAD_MAX_MB = "5";
+process.env.BILLING_FREE_LIKE_LIMIT = "2"; // exercise the free-plan like budget
 
 const { createApp } = await import("../src/app.js");
 const { migrate } = await import("../src/db/migrate.js");
@@ -58,10 +59,11 @@ function assertEqual(actual, expected, label) {
 
 let baseUrl = "";
 
-async function api(method, route, { body, token, form } = {}) {
+async function api(method, route, { body, token, form, headers: extraHeaders } = {}) {
   const headers = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined) headers["Content-Type"] = "application/json";
+  Object.assign(headers, extraHeaders || {});
 
   const options = { method, headers };
   if (form) options.body = form;
@@ -693,6 +695,225 @@ await check("POST /api/auth/reactivate restores the account", async () => {
 
   const me = await api("GET", "/api/auth/me", { token: body.data.token });
   assertEqual(me.status, 200, "token works");
+});
+
+/* ── module 3: plans, checkout, paystack (mock), perks, expiry ─────────── */
+const billing = {};
+
+// module 1's session tests (logout-everywhere, deactivate/reactivate) killed
+// the original token, so the billing section signs back in first
+const billingLogin = await api("POST", "/api/auth/login", {
+  body: { email: session.email, password: session.password },
+});
+assertEqual(billingLogin.status, 200, "billing section re-login");
+session.token = billingLogin.body.data.token;
+
+await check("GET /api/billing/plans publishes the catalogue and my free state", async () => {
+  const { status, body } = await api("GET", "/api/billing/plans", { token: session.token });
+  assertEqual(status, 200, "status");
+  assertEqual(body.data.plans.length, 3, "three plans");
+  assertEqual(body.data.plan, "FREE", "current plan");
+  assertEqual(body.data.perks.unlimitedLikes, false, "free perk matrix");
+  assertEqual(body.data.limits.freeLikesPerDay, 2, "env-driven like limit");
+});
+
+await check("advanced search filters are a paid perk", async () => {
+  const { status, body } = await api("GET", "/api/discover/search?interests=coffee", {
+    token: session.token,
+  });
+  assertEqual(status, 402, "status");
+  assertEqual(body.code, "PLAN_REQUIRED", "code");
+
+  const basic = await api("GET", "/api/discover/search?location=accra", { token: session.token });
+  assertEqual(basic.status, 200, "basic filters stay free");
+});
+
+await check("seeing who liked you is VIP-only", async () => {
+  const { status, body } = await api("GET", "/api/discover/likes-you", { token: session.token });
+  assertEqual(status, 402, "status");
+  assertEqual(body.code, "PLAN_REQUIRED", "code");
+});
+
+await check("the free like budget stops the third like", async () => {
+  const second = await api("POST", "/api/swipes", {
+    token: session.token,
+    body: { targetId: dating.b.id, decision: "LIKE" },
+  });
+  assertEqual(second.status, 200, "second like of the day");
+
+  billing.buddy3 = await registerOnboard({
+    name: "Smoke Third", gender: "MAN", birthDate: "1988-03-03", city: "Accra",
+    interestedIn: ["WOMAN"], minAge: 25, maxAge: 45,
+  });
+  const third = await api("POST", "/api/swipes", {
+    token: session.token,
+    body: { targetId: billing.buddy3.id, decision: "LIKE" },
+  });
+  assertEqual(third.status, 200, "second like of the day");
+
+  billing.buddy4 = await registerOnboard({
+    name: "Smoke Fourth", gender: "MAN", birthDate: "1987-07-07", city: "Accra",
+    interestedIn: ["WOMAN"], minAge: 25, maxAge: 45,
+  });
+  const over = await api("POST", "/api/swipes", {
+    token: session.token,
+    body: { targetId: billing.buddy4.id, decision: "LIKE" },
+  });
+  assertEqual(over.status, 402, "third like is refused");
+  assertEqual(over.body.code, "LIKE_LIMIT_REACHED", "code");
+});
+
+await check("checkout validates plan, channel and wallet phone", async () => {
+  const free = await api("POST", "/api/billing/checkout", {
+    token: session.token,
+    body: { plan: "FREE", channel: "card" },
+  });
+  assertEqual(free.status, 422, "FREE is not a paid plan");
+
+  const noPhone = await api("POST", "/api/billing/checkout", {
+    token: session.token,
+    body: { plan: "PREMIUM", channel: "mobile_money" },
+  });
+  assertEqual(noPhone.status, 422, "momo needs a phone");
+  assert(noPhone.body.fields?.phone, "phone field error");
+});
+
+await check("checkout creates a PENDING subscription and a mock checkout url", async () => {
+  const { status, body } = await api("POST", "/api/billing/checkout", {
+    token: session.token,
+    body: { plan: "PREMIUM", channel: "mobile_money", phone: "0244000000", provider: "mtn" },
+  });
+  assertEqual(status, 201, "status");
+  assertEqual(body.data.mode, "mock", "mock paystack without a secret key");
+  assert(body.data.reference, "reference");
+  assert(body.data.checkoutUrl.includes("reference="), "checkout url carries the reference");
+  billing.reference = body.data.reference;
+
+  const current = await api("GET", "/api/billing/subscription", { token: session.token });
+  assertEqual(current.body.data.history[0].status, "PENDING", "subscription pending");
+  assertEqual(current.body.data.subscription, null, "nothing live yet");
+
+  const early = await api("POST", "/api/billing/verify", {
+    token: session.token,
+    body: { reference: billing.reference },
+  });
+  assertEqual(early.body.data.active, false, "unapproved payment does not activate");
+});
+
+await check("approving the payment activates the plan with a real window", async () => {
+  const approved = await api("POST", "/api/billing/mock-pay", {
+    token: session.token,
+    body: { reference: billing.reference },
+  });
+  assertEqual(approved.status, 200, "mock approval");
+
+  const verified = await api("POST", "/api/billing/verify", {
+    token: session.token,
+    body: { reference: billing.reference },
+  });
+  assertEqual(verified.body.data.active, true, "subscription active");
+  assertEqual(verified.body.data.plan, "PREMIUM", "plan");
+  assert(verified.body.data.expiresAt > new Date().toISOString(), "expiry in the future");
+
+  const plans = await api("GET", "/api/billing/plans", { token: session.token });
+  assertEqual(plans.body.data.plan, "PREMIUM", "catalogue reflects premium");
+  assertEqual(plans.body.data.perks.advancedFilters, true, "premium perk");
+
+  const search = await api("GET", "/api/discover/search?interests=coffee", { token: session.token });
+  assertEqual(search.status, 200, "advanced filters unlocked");
+});
+
+await check("premium unlocks unlimited likes and read receipts", async () => {
+  const third = await api("POST", "/api/swipes", {
+    token: session.token,
+    body: { targetId: billing.buddy4.id, decision: "LIKE" },
+  });
+  assertEqual(third.status, 200, "unlimited likes now");
+
+  const back = await api("POST", "/api/swipes", {
+    token: billing.buddy4.token,
+    body: { targetId: session.id, decision: "LIKE" },
+  });
+  assertEqual(back.status, 201, "mutual like matches");
+  billing.matchId = back.body.data.match.id;
+
+  await api("POST", `/api/matches/${billing.matchId}/messages`, {
+    token: session.token,
+    body: { content: "Testing read receipts." },
+  });
+  const readResp = await api("POST", `/api/matches/${billing.matchId}/read`, { token: billing.buddy4.token });
+  assertEqual(readResp.status, 200, "partner marks the thread read");
+
+  const thread = await api("GET", `/api/matches/${billing.matchId}/messages`, {
+    token: session.token,
+  });
+  assertEqual(thread.body.data.readReceipts, true, "receipts on for premium");
+  const mine = thread.body.data.items.find((message) => message.mine);
+  assertEqual(mine.seen, true, "my message shows as read");
+});
+
+await check("a signed charge.success webhook activates VIP", async () => {
+  const checkout = await api("POST", "/api/billing/checkout", {
+    token: session.token,
+    body: { plan: "VIP", channel: "card" },
+  });
+  assertEqual(checkout.status, 201, "vip checkout");
+  billing.vipReference = checkout.body.data.reference;
+
+  const crypto = await import("node:crypto");
+  const payload = JSON.stringify({
+    event: "charge.success",
+    data: { reference: billing.vipReference },
+  });
+  const signature = crypto
+    .createHmac("sha512", "streetmeet-mock-paystack-secret")
+    .update(payload, "utf8")
+    .digest("hex");
+
+  const bad = await api("POST", "/api/billing/webhook", {
+    body: JSON.parse(payload),
+    headers: { "x-paystack-signature": "nope" },
+  });
+  assertEqual(bad.status, 400, "bad signature rejected");
+
+  const good = await api("POST", "/api/billing/webhook", {
+    body: JSON.parse(payload),
+    headers: { "x-paystack-signature": signature },
+  });
+  assert(
+    good.body.data?.activated === true,
+    `webhook responded ${good.status}: ${JSON.stringify(good.body)}`,
+  );
+
+  const plans = await api("GET", "/api/billing/plans", { token: session.token });
+  assertEqual(plans.body.data.plan, "VIP", "vip is live");
+  const likesYou = await api("GET", "/api/discover/likes-you", { token: session.token });
+  assertEqual(likesYou.status, 200, "likes-you unlocked for vip");
+});
+
+await check("expired subscriptions drop back to free and get swept", async () => {
+  const { db } = await import("../src/db/index.js");
+  await db.run("UPDATE subscriptions SET expires_at = ? WHERE user_id = ?", [
+    "2020-01-01T00:00:00.000Z",
+    session.id,
+  ]);
+
+  const plans = await api("GET", "/api/billing/plans", { token: session.token });
+  assertEqual(plans.body.data.plan, "FREE", "expiry is honoured on read");
+
+  const { expireStale } = await import("../src/repositories/subscriptionRepository.js");
+  const flipped = await expireStale();
+  assert(flipped >= 1, "sweeper flips stale rows");
+
+  const current = await api("GET", "/api/billing/subscription", { token: session.token });
+  assert(
+    current.body.data.history.every((row) => row.active === false),
+    "nothing stays live after expiry",
+  );
+  assert(
+    current.body.data.history.some((row) => row.status === "EXPIRED"),
+    "swept rows are marked EXPIRED",
+  );
 });
 
 /* ── other modules stay honest ─────────────────────────────────────────── */

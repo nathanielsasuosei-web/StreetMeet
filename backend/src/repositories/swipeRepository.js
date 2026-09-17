@@ -43,6 +43,15 @@ export async function deleteLikesBetween(a, b, tx = db) {
   );
 }
 
+/** How many likes I sent since `sinceIso` - the free-plan daily budget. */
+export async function countLikesSince(userId, sinceIso, tx = db) {
+  const row = await tx.get(
+    "SELECT COUNT(*) AS total FROM likes WHERE sender_id = ? AND decision = 'LIKE' AND created_at >= ?",
+    [userId, sinceIso],
+  );
+  return row?.total ?? 0;
+}
+
 /** Ids of everyone I already swiped on (like or pass) - deck exclusion. */
 export async function listSwipedIds(userId) {
   const rows = await db.all("SELECT receiver_id FROM likes WHERE sender_id = ?", [userId]);
