@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 
-import { SESSION_STATUS, useAuth } from '../context/AuthContext'
+import { SESSION_STATUS } from '../context/contexts.js'
+import { useAuth } from '../hooks/useAuth'
 
 export function PageLoading({ label = 'Loading…' }) {
   return (

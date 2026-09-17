@@ -257,7 +257,12 @@ async function waitFor(predicate, { timeout = 8000, label = 'condition' } = {}) 
   const started = Date.now()
   for (;;) {
     if (predicate()) return true
-    if (Date.now() - started > timeout) return false
+    if (Date.now() - started > timeout) {
+      if (process.env.UI_SMOKE_DEBUG) {
+        console.warn(`[ui-smoke] gave up after ${timeout}ms waiting for: ${label}`)
+      }
+      return false
+    }
     await settle(60)
   }
 }

@@ -20,6 +20,6 @@
     "test": "npm run test:api && npm run test:ui",
     "test:api": "npm --prefix backend run smoke",
     "test:ui": "npm --prefix website run test:ui",
-    "lint": "npm --prefix website run lint"
+    "lint": "npm --prefix backend run lint && npm --prefix website run lint"
   }
 }

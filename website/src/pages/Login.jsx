@@ -4,8 +4,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card, CardBody } from '../components/ui/Card'
 import { Field, PasswordInput, TextInput } from '../components/ui/Field'
-import { useAuth } from '../context/AuthContext'
-import { useToast } from '../context/ToastContext'
+import { useAuth } from '../hooks/useAuth'
+import { useToast } from '../hooks/useToast'
 import { useForm } from '../hooks/useForm'
 
 const DEMO_ACCOUNT = { email: 'ama@streetmeet.dev', password: 'Street1234' }

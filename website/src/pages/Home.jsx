@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Avatar } from '../components/ui/Avatar'
 import { Button } from '../components/ui/Button'
 import { Card, CardBody } from '../components/ui/Card'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../hooks/useAuth'
 
 const FEATURES = [
   {
