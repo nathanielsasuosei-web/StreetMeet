@@ -1,27 +1,176 @@
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from 'react'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 
-function Navbar() {
+import { useAuth } from '../context/AuthContext'
+import { Avatar } from './ui/Avatar'
+import { Button } from './ui/Button'
+
+const PUBLIC_LINKS = [{ to: '/', label: 'Home', end: true }]
+
+const APP_LINKS = [
+  { to: '/matches', label: 'Discover' },
+  { to: '/messages', label: 'Messages' },
+  { to: '/status', label: 'Status' },
+  { to: '/premium', label: 'Premium' },
+]
+
+export function Navbar() {
+  const { isAuthenticated, user, logout, profileComplete } = useAuth()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [linksOpen, setLinksOpen] = useState(false)
+  const menuRef = useRef(null)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!menuOpen) return undefined
+    const onClickAway = (event) => {
+      if (!menuRef.current?.contains(event.target)) setMenuOpen(false)
+    }
+    const onEscape = (event) => event.key === 'Escape' && setMenuOpen(false)
+    document.addEventListener('mousedown', onClickAway)
+    document.addEventListener('keydown', onEscape)
+    return () => {
+      document.removeEventListener('mousedown', onClickAway)
+      document.removeEventListener('keydown', onEscape)
+    }
+  }, [menuOpen])
+
+  const links = isAuthenticated ? [...PUBLIC_LINKS, ...APP_LINKS] : PUBLIC_LINKS
+
+  async function signOut() {
+    setMenuOpen(false)
+    // Leave the protected area first - otherwise the route guard bounces the
+    // member to /login before the sign-out navigation lands.
+    navigate('/', { replace: true })
+    await logout()
+  }
+
+  function go(path) {
+    setMenuOpen(false)
+    setLinksOpen(false)
+    navigate(path)
+  }
+
   return (
-    <nav style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "15px 30px",
-      background: "#111827",
-      color: "white"
-    }}>
-      <h2 style={{ color: "#22c55e" }}>Street Meet</h2>
+    <header className="nav">
+      <div className="container nav-inner">
+        <Link to="/" className="brand" onClick={() => setLinksOpen(false)}>
+          <span className="brand-mark" aria-hidden="true">
+            ♥
+          </span>
+          StreetMeet
+        </Link>
 
-      <div style={{ display: "flex", gap: "20px" }}>
-        <Link to="/">Home</Link>
-        <Link to="/matches">Matches</Link>
-        <Link to="/messages">Messages</Link>
-        <Link to="/status">Status</Link>
-        <Link to="/premium">Premium</Link>
-        <Link to="/profile">Profile</Link>
+        <nav className="nav-links" data-open={linksOpen} aria-label="Main">
+          {links.map((link) => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              end={link.end}
+              className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+              onClick={() => setLinksOpen(false)}
+            >
+              {link.label}
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="nav-actions">
+          {isAuthenticated ? (
+            <>
+              {!profileComplete ? (
+                <Button size="sm" variant="accent" onClick={() => go('/onboarding')}>
+                  Finish profile
+                </Button>
+              ) : null}
+
+              <div ref={menuRef} style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setMenuOpen((open) => !open)}
+                  aria-expanded={menuOpen}
+                  aria-haspopup="menu"
+                  style={{ padding: 4, borderRadius: 999 }}
+                >
+                  <Avatar src={user?.profileImage} name={user?.fullName} size="sm" />
+                </button>
+
+                {menuOpen ? (
+                  <div
+                    role="menu"
+                    className="card"
+                    style={{
+                      position: 'absolute',
+                      right: 0,
+                      top: 'calc(100% + 8px)',
+                      minWidth: 230,
+                      padding: 8,
+                      zIndex: 50,
+                      boxShadow: 'var(--sh-2)',
+                    }}
+                  >
+                    <div style={{ padding: '8px 10px 12px', borderBottom: '1px solid var(--line)' }}>
+                      <strong className="strong" style={{ display: 'block' }}>
+                        {user?.fullName}
+                      </strong>
+                      <span className="tiny muted">{user?.email}</span>
+                    </div>
+
+                    {[
+                      { label: 'My profile', path: '/profile' },
+                      { label: 'Edit profile', path: '/profile/edit' },
+                      { label: 'Account settings', path: '/settings' },
+                    ].map((item) => (
+                      <button
+                        key={item.path}
+                        type="button"
+                        role="menuitem"
+                        className="tab"
+                        style={{ width: '100%' }}
+                        onClick={() => go(item.path)}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="tab"
+                      style={{ width: '100%', color: 'var(--danger)' }}
+                      onClick={signOut}
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => go('/login')}>
+                Log in
+              </Button>
+              <Button size="sm" onClick={() => go('/register')}>
+                Create account
+              </Button>
+            </>
+          )}
+
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-label="Toggle navigation"
+            aria-expanded={linksOpen}
+            onClick={() => setLinksOpen((open) => !open)}
+          >
+            ☰
+          </button>
+        </div>
       </div>
-    </nav>
-  );
+    </header>
+  )
 }
 
-export default Navbar;
+export default Navbar

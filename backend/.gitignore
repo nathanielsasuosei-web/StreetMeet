@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Local environment (never commit real secrets)
+.env
+.env.local
+.env.*.local
+
+# Local dev database (SQLite)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Uploaded media - keep the folder, ignore the files
+uploads/*
+!uploads/.gitkeep
+!uploads/profiles/
+uploads/profiles/*
+!uploads/profiles/.gitkeep
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

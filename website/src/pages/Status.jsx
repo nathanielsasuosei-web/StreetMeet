@@ -1,15 +1,13 @@
-function Status() {
+import { ComingSoon } from '../components/ComingSoon'
+
+export function Status() {
   return (
-    <div>
-      <h1>Street Meet Status</h1>
-
-      <p>
-        Share your moments with people you connect with.
-      </p>
-
-      <button>Create Status</button>
-    </div>
-  );
+    <ComingSoon
+      title="Status"
+      milestone="status - short-lived photo and text updates"
+      description="Share a moment with the people you have connected with. Statuses will reuse the same upload pipeline as your profile photo."
+    />
+  )
 }
 
-export default Status;
+export default Status

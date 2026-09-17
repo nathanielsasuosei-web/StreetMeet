@@ -1,82 +1,68 @@
-import helmet from "helmet";
-import rateLimit from "express-rate-limit";
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
+/**
+ * StreetMeet API - boot.
+ *
+ *   npm run dev      # nodemon
+ *   npm start        # production
+ *   npm run db:setup # migrate + seed the local database
+ */
+import fs from "node:fs";
 
-import authRoutes from "./routes/authRoutes.js";
-import profileRoutes from "./routes/profileRoutes.js";
-import matchRoutes from "./routes/matchRoutes.js";
-import chatRoutes from "./routes/chatRoutes.js";
-import statusRoutes from "./routes/statusRoutes.js";
+import { createApp } from "./app.js";
+import { env } from "./config/env.js";
+import db, { closeDb } from "./db/index.js";
+import { migrate } from "./db/migrate.js";
 
-import authMiddleware from "./middleware/authMiddleware.js";
+async function boot() {
+  fs.mkdirSync(env.uploads.profilesDir, { recursive: true });
 
-dotenv.config();
+  console.log(`🗄️  database: ${env.database.provider} (${env.database.url})`);
 
-const app = express();
+  if (env.autoMigrate) {
+    const applied = await migrate({ log: false });
+    console.log(
+      applied.length
+        ? `   ✓ applied ${applied.length} migration(s): ${applied.join(", ")}`
+        : "   ✓ schema up to date"
+    );
+  } else {
+    // Fail fast when the schema is missing instead of erroring per request.
+    try {
+      await db.get("SELECT COUNT(*) AS total FROM users");
+    } catch {
+      throw new Error(
+        'Database is not migrated. Run "npm run db:migrate" (or set AUTO_MIGRATE=true for local development).'
+      );
+    }
+  }
 
-app.use(cors());
-app.use(express.json());
-
-app.get("/", (req, res) => {
-  res.json({
-    app: "Street Meet API",
-    status: "Running"
+  const app = await createApp();
+  const server = app.listen(env.port, env.host, () => {
+    console.log(`✅ StreetMeet API listening on http://${env.host}:${env.port}`);
+    console.log(`   health:  http://localhost:${env.port}/api/health`);
+    console.log(`   client:  ${env.clientUrl}`);
   });
+
+  const shutdown = async (signal) => {
+    console.log(`\n${signal} received - shutting down.`);
+    server.close(async () => {
+      await closeDb();
+      process.exit(0);
+    });
+    // Do not hang forever on stuck connections.
+    setTimeout(() => process.exit(1), 10_000).unref();
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("unhandledRejection", (reason) => {
+    console.error("💥 unhandled rejection:", reason);
+  });
+
+  return server;
+}
+
+boot().catch((error) => {
+  console.error("❌ Failed to start the API:", error.message);
+  if (env.isDev) console.error(error.stack);
+  process.exit(1);
 });
-
-app.use("/api/auth", authRoutes);
-
-app.use(
-  "/api/profile",
-  authMiddleware,
-  profileRoutes
-);
-
-app.use(
-  "/api/matches",
-  authMiddleware,
-  matchRoutes
-);
-
-app.use(
-  "/api/chat",
-  authMiddleware,
-  chatRoutes
-);
-
-app.use(
-  "/api/status",
-  authMiddleware,
-  statusRoutes
-);
-
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-});import paymentRoutes from "./routes/paymentRoutes.js";
-
-
-app.use(
-"/api/payment",
-authMiddleware,
-paymentRoutes
-);
-app.use(helmet());
-
-
-const limiter = rateLimit({
-
-windowMs: 15 * 60 * 1000,
-
-max: 100,
-
-message:
-"Too many requests, please try again later."
-
-});
-
-
-app.use(limiter);

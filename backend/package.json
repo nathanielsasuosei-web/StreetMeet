@@ -1,14 +1,23 @@
 {
   "name": "streetmeet-backend",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "description": "StreetMeet API - user accounts, profiles, preferences and account settings",
   "type": "module",
   "main": "src/server.js",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "db:migrate": "node scripts/migrate.js",
+    "db:reset": "node scripts/migrate.js --fresh",
+    "db:seed": "node scripts/seed.js",
+    "db:setup": "node scripts/migrate.js && node scripts/seed.js",
+    "smoke": "node scripts/smoke.js",
+    "check": "node --check src/server.js"
   },
   "dependencies": {
-    "@prisma/client": "^6.0.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^17.0.0",
@@ -17,10 +26,12 @@
     "express-validator": "^7.3.2",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "pg": "^8.16.0",
+    "sharp": "^0.34.0",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10",
-    "prisma": "^6.0.0"
+    "nodemon": "^3.1.10"
   }
 }

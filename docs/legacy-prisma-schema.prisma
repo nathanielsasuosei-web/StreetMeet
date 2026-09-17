@@ -1,0 +1,211 @@
+// ══════════════════════════════════════════════════════════════════════════
+//  LEGACY REFERENCE ONLY - not wired into the running application.
+//
+//  This is the old `backend/prisma/schema.prisma`, cleaned up: it used to
+//  contain three separate `User` models and several enums pasted inline, so it
+//  did not parse at all.
+//
+//  Module 1 (User Accounts) was rebuilt on the portable SQL layer in
+//  `backend/db/migrations/<sqlite|postgresql>/` and `backend/src/db`, which
+//  needs no Prisma engine download (Node's built-in SQLite for dev, `pg` for
+//  production). Prisma is therefore no longer a dependency of this repo.
+//
+//  Keep this file as the data-model reference while migrating modules 2-6.
+//  The authoritative, executed schema is the SQL in `backend/db/migrations/`.
+//
+//  Portability constraints used by the SQL migrations (and mirrored here):
+//    * no enums         -> VARCHAR/TEXT + validation in src/constants/profile.js
+//    * no scalar lists  -> join tables (user_interests) or JSONB/TEXT columns
+//    * timestamps       -> TIMESTAMPTZ (PostgreSQL) / TEXT ISO-8601 (SQLite)
+// ══════════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = env("DATABASE_PROVIDER") // "postgresql" in production, "sqlite" in dev
+  url      = env("DATABASE_URL")
+}
+
+// ── Module 1: user accounts (live) ────────────────────────────────────────
+
+model User {
+  id            String    @id @default(uuid())
+  fullName      String
+  email         String    @unique
+  passwordHash  String
+  phoneNumber   String?   @unique
+
+  // MAN | WOMAN | NON_BINARY | OTHER
+  gender        String?
+  // Stored as a date only; age is always derived, never stored.
+  birthDate     DateTime?
+  bio           String?
+  city          String?
+  country       String?
+  profileImage  String?
+  coverImage    String?
+
+  // USER | MODERATOR | ADMIN
+  role          String    @default("USER")
+  verified      Boolean   @default(false)
+  // Bumping this invalidates every JWT already issued for the account.
+  tokenVersion  Int       @default(0)
+
+  deactivatedAt DateTime?
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  interests     UserInterest[]
+  preferences   DatingPreference?
+  settings      AccountSettings?
+
+  likesSent        Like[]      @relation("SentLikes")
+  likesReceived    Like[]      @relation("ReceivedLikes")
+  matchesAsOne     Match[]     @relation("UserOneMatches")
+  matchesAsTwo     Match[]     @relation("UserTwoMatches")
+  sentMessages     Message[]   @relation("SentMessages")
+  receivedMessages Message[]   @relation("ReceivedMessages")
+  statuses         Status[]
+  subscriptions    Subscription[]
+  reportsFiled     Report[]    @relation("FiledReports")
+  reportsAgainst   Report[]    @relation("ReportsAgainst")
+  blocksMade       Block[]     @relation("BlocksMade")
+  blocksReceived   Block[]     @relation("BlocksReceived")
+}
+
+model UserInterest {
+  userId String
+  slug   String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, slug])
+  @@index([slug])
+}
+
+model DatingPreference {
+  userId          String   @id
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // JSON array of gender values: ["MAN"], ["WOMAN","NON_BINARY"], ...
+  interestedIn    Json
+  minAge          Int      @default(18)
+  maxAge          Int      @default(45)
+  // null = anywhere
+  maxDistanceKm   Int?
+  // CASUAL | DATING | SERIOUS | MARRIAGE | FRIENDSHIP
+  relationshipGoal String?
+  openToNearby    Boolean  @default(true)
+
+  updatedAt       DateTime @updatedAt
+}
+
+model AccountSettings {
+  userId              String   @id
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // PUBLIC | MATCHES_ONLY | PRIVATE
+  profileVisibility   String   @default("PUBLIC")
+  showAge             Boolean  @default(true)
+  showLocation        Boolean  @default(true)
+  showOnlineStatus    Boolean  @default(true)
+  discoverable        Boolean  @default(true)
+  // EVERYONE | MATCHES | NOBODY
+  allowMessagesFrom   String   @default("MATCHES")
+
+  emailNotifications   Boolean @default(true)
+  pushNotifications    Boolean @default(true)
+  matchNotifications   Boolean @default(true)
+  messageNotifications Boolean @default(true)
+  productUpdates       Boolean @default(false)
+  twoFactorEnabled     Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
+}
+
+// ── Modules 2-6: carried over, not used by migrated code yet ─────────────
+
+model Like {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  sender     User     @relation("SentLikes", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReceivedLikes", fields: [receiverId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([senderId, receiverId])
+}
+
+model Match {
+  id        String   @id @default(uuid())
+  userOneId String
+  userTwoId String
+  userOne   User     @relation("UserOneMatches", fields: [userOneId], references: [id], onDelete: Cascade)
+  userTwo   User     @relation("UserTwoMatches", fields: [userTwoId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userOneId, userTwoId])
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  content    String
+  seen       Boolean  @default(false)
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([senderId, receiverId, createdAt])
+}
+
+model Status {
+  id        String   @id @default(uuid())
+  userId    String
+  text      String?
+  mediaUrl  String?
+  mediaType String?
+  views     Int      @default(0)
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Subscription {
+  id              String   @id @default(uuid())
+  userId          String
+  // DAILY | WEEKLY | MONTHLY | PREMIUM_PLUS
+  plan            String
+  amount          Float
+  paymentReference String? @unique
+  active          Boolean  @default(false)
+  expiresAt       DateTime
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+}
+
+model Report {
+  id             String   @id @default(uuid())
+  reporterId     String
+  reportedUserId String
+  reason         String
+  // OPEN | REVIEWING | RESOLVED | DISMISSED
+  status         String   @default("OPEN")
+  reporter       User     @relation("FiledReports", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUser   User     @relation("ReportsAgainst", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+}
+
+model Block {
+  id            String   @id @default(uuid())
+  blockerId     String
+  blockedUserId String
+  blocker       User     @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedUser   User     @relation("BlocksReceived", fields: [blockedUserId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
+  @@unique([blockerId, blockedUserId])
+}
