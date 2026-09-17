@@ -131,6 +131,40 @@ export const api = {
     publicProfile: (id) => request(`/api/profile/${encodeURIComponent(id)}`),
   },
 
+  discover: {
+    deck: (limit) => request(withQuery('/api/discover/deck', { limit })),
+    search: (params) => request(withQuery('/api/discover/search', params)),
+  },
+
+  swipes: {
+    create: (payload) => request('/api/swipes', { method: 'POST', body: payload }),
+  },
+
+  matches: {
+    list: () => request('/api/matches'),
+    get: (id) => request(`/api/matches/${encodeURIComponent(id)}`),
+    messages: (id, params) =>
+      request(withQuery(`/api/matches/${encodeURIComponent(id)}/messages`, params)),
+    send: (id, content) =>
+      request(`/api/matches/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { content } }),
+    markRead: (id) => request(`/api/matches/${encodeURIComponent(id)}/read`, { method: 'POST' }),
+    unmatch: (id) => request(`/api/matches/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  },
+
+  moderation: {
+    block: (id) => request(`/api/users/${encodeURIComponent(id)}/block`, { method: 'POST' }),
+    unblock: (id) => request(`/api/users/${encodeURIComponent(id)}/block`, { method: 'DELETE' }),
+    blocks: () => request('/api/blocks'),
+    report: (id, payload) =>
+      request(`/api/users/${encodeURIComponent(id)}/report`, { method: 'POST', body: payload }),
+  },
+
+  notifications: {
+    list: (limit) => request(withQuery('/api/notifications', { limit })),
+    readAll: () => request('/api/notifications/read', { method: 'POST' }),
+    readOne: (id) => request(`/api/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' }),
+  },
+
   settings: {
     get: () => request('/api/settings'),
     update: (payload) => request('/api/settings', { method: 'PATCH', body: payload }),

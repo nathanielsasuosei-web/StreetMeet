@@ -10,6 +10,7 @@
  *   `toPublicProfile`   only what that owner's settings allow others to see
  */
 import { INTERESTS_MIN } from "../constants/profile.js";
+import { bool, dateOnly, iso } from "../db/normalize.js";
 import { ageFrom } from "./age.js";
 
 export function firstNameOf(fullName) {
@@ -114,4 +115,62 @@ export function toPublicProfile({ user, interests = [], settings = null, isMatch
   };
 }
 
-export default { toPrivateProfile, toPublicProfile, missingProfileFields, firstNameOf };
+/**
+ * Discover/match card built straight from a joined SQL row (snake_case),
+ * because the dating queries return display columns plus the owner's
+ * per-field privacy switches in one indexed round-trip.
+ */
+export function toDiscoverCard({ row, interests = [] }) {
+  const showAge = bool(row.show_age, true);
+  const showLocation = bool(row.show_location, true);
+  const city = showLocation ? row.city : null;
+  const country = showLocation ? row.country : null;
+
+  return {
+    id: row.id,
+    fullName: row.full_name,
+    firstName: firstNameOf(row.full_name),
+    gender: row.gender,
+    age: showAge ? ageFrom(dateOnly(row.birth_date)) : null,
+    bio: row.bio,
+    city,
+    country,
+    location: [city, country].filter(Boolean).join(", ") || null,
+    profileImage: row.profile_image,
+    interests,
+    relationshipGoal: row.relationship_goal ?? null,
+  };
+}
+
+/** Notification centre entry; payload stays a plain object for the UI. */
+export function toNotificationItem({ row }) {
+  let payload = null;
+  if (row.payload) {
+    try {
+      payload = JSON.parse(row.payload);
+    } catch {
+      payload = null;
+    }
+  }
+
+  return {
+    id: row.id,
+    type: row.type,
+    matchId: row.match_id,
+    payload,
+    readAt: iso(row.read_at),
+    createdAt: iso(row.created_at),
+    actor: row.actor_id
+      ? { id: row.actor_id, name: row.actor_name, image: row.actor_image }
+      : null,
+  };
+}
+
+export default {
+  toPrivateProfile,
+  toPublicProfile,
+  toDiscoverCard,
+  toNotificationItem,
+  missingProfileFields,
+  firstNameOf,
+};

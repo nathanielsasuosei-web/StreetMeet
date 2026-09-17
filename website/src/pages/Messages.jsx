@@ -1,13 +1,8 @@
-import { ComingSoon } from '../components/ComingSoon'
+import { Navigate } from 'react-router-dom'
 
+/** /messages was the module-1 placeholder: conversations live under /matches now. */
 export function Messages() {
-  return (
-    <ComingSoon
-      title="Messages"
-      milestone="chat - real-time threads with your matches"
-      description="Who can message you is already controlled by your account settings (Settings → Privacy → Who can message you)."
-    />
-  )
+  return <Navigate to="/matches" replace />
 }
 
 export default Messages

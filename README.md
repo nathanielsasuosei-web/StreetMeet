@@ -15,13 +15,14 @@ scripts/   Repo-level tooling (runs both apps together)
 | # | Module | State |
 | - | ------ | ----- |
 | 1 | **User accounts** | ✅ **Rebuilt** - sign up/login, profile creation, photo, age/location/bio/interests, gender + dating preferences, edit profile, account settings |
-| 2 | Matching & discovery | 🚧 Not migrated - endpoint answers `501 MODULE_NOT_MIGRATED` |
+| 2 | Dating (discover, match, message, moderate) | ✅ Rebuilt - see [docs/DATING_FEATURES.md](docs/DATING_FEATURES.md) |
 | 3 | Chat & messaging | 🚧 Not migrated |
 | 4 | Status updates | 🚧 Not migrated |
 | 5 | Premium & payments | 🚧 Not migrated |
 | 6 | Admin & moderation | 🚧 Not migrated |
 
-Module 1 is documented in detail in **[docs/USER_ACCOUNTS.md](docs/USER_ACCOUNTS.md)**.
+Module 1 is documented in detail in **[docs/USER_ACCOUNTS.md](docs/USER_ACCOUNTS.md)**,
+module 2 in **[docs/DATING_FEATURES.md](docs/DATING_FEATURES.md)**.
 
 The older modules are still in the repository untouched. They were written against a Prisma client
 that this environment cannot download engines for, and two of them (`payments`, `admin`) import files

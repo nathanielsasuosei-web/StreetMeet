@@ -503,6 +503,197 @@ await check('the photo uploader sends a multipart upload and shows the result', 
   assert(shown, 'the new photo never appeared in the page')
 })
 
+
+/* ── module 2: discover, match, message, moderate, notify ──────────────── */
+const dating = {}
+
+await check('the discover deck loads compatible members', async () => {
+  await click(byText('a.nav-link', 'Discover'), 'discover link')
+  const loaded = await waitFor(
+    () => Boolean($('.profile-card')) || text().includes('No one new right now'),
+    { label: 'deck to load' },
+  )
+  assert(loaded, 'deck never loaded')
+  assert(calledApi('GET', '/api/discover/deck'), 'expected GET /api/discover/deck')
+  assert($('.profile-card'), `expected a card in the deck (body: ${text().slice(0, 140)})`)
+})
+
+await check('passing moves the deck to the next profile', async () => {
+  const before = $('.profile-card-overlay strong')?.textContent
+  await click($('button[aria-label="Pass"]'), 'pass button')
+  const moved = await waitFor(
+    () => $('.profile-card-overlay strong')?.textContent !== before || text().includes('No one new right now'),
+    { label: 'deck to advance' },
+  )
+  assert(moved, 'deck did not advance after a pass')
+  assert(calledApi('POST', '/api/swipes'), 'expected POST /api/swipes')
+})
+
+await check('a mutual like opens the match celebration', async () => {
+  // A second throwaway account likes the test account through the API; when
+  // the test account likes back in the UI both sides are throwaways, so every
+  // trace disappears when the cleanup step deletes both accounts.
+  const buddyEmail = `ui-smoke-buddy+${Date.now()}@streetmeet.dev`
+  const reg = await nodeFetch(`${BACKEND}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fullName: 'Smoke Buddy',
+      email: buddyEmail,
+      password: 'Street1234',
+      confirmPassword: 'Street1234',
+    }),
+  })
+  const regBody = await reg.json()
+  assert(reg.status === 201, `buddy register responded ${reg.status}`)
+  dating.buddyToken = regBody.data.token
+
+  const onboard = await nodeFetch(`${BACKEND}/api/profile/onboard`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${dating.buddyToken}` },
+    body: JSON.stringify({
+      gender: 'MAN',
+      birthDate: '1990-01-01',
+      city: 'Accra',
+      country: 'Ghana',
+      bio: 'Second throwaway smoke account, here to like and be liked back.',
+      interests: ['coffee', 'tech', 'travel'],
+      interestedIn: ['WOMAN'],
+      minAge: 21,
+      maxAge: 45,
+    }),
+  })
+  assert(onboard.ok, `buddy onboarding responded ${onboard.status}`)
+
+  const me = await nodeFetch(`${BACKEND}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${window.localStorage.getItem('streetmeet.token')}` },
+  })
+  const meBody = await me.json()
+
+  const like = await nodeFetch(`${BACKEND}/api/swipes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${dating.buddyToken}` },
+    body: JSON.stringify({ targetId: meBody.data.user.id, decision: 'LIKE' }),
+  })
+  assert(like.ok, `buddy like responded ${like.status}`)
+
+  await click(byText('button.segmented-item', 'Search & filters'), 'search mode')
+  await fill('input[placeholder="e.g. chef"]', 'Buddy')
+  await click(byText('button', 'Search profiles'), 'search button')
+  const found = await waitFor(() => Boolean(byText('.profile-grid .profile-card', 'Smoke')), {
+    label: 'search result',
+  })
+  assert(found, 'search did not surface the buddy profile')
+
+  await click(byText('.profile-grid button', 'Like'), 'like button')
+  const matched = await waitFor(() => text().includes("It's a match!"), { label: 'match modal' })
+  assert(matched, 'the match celebration never appeared')
+
+  const matches = await nodeFetch(`${BACKEND}/api/matches`, {
+    headers: { Authorization: `Bearer ${dating.buddyToken}` },
+  })
+  const matchesBody = await matches.json()
+  dating.matchId = matchesBody.data.items[0]?.id
+  assert(dating.matchId, 'buddy has no match after the mutual like')
+
+  const sent = await nodeFetch(`${BACKEND}/api/matches/${dating.matchId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${dating.buddyToken}` },
+    body: JSON.stringify({ content: 'Hello from the other smoke account!' }),
+  })
+  assert(sent.ok, `buddy message responded ${sent.status}`)
+
+  await click(byText('button', 'Keep discovering'), 'close match modal')
+})
+
+await check('the matches list shows the new match with an unread badge', async () => {
+  await click(byText('a.nav-link', 'Matches'), 'matches link')
+  const shown = await waitFor(() => text().includes('Hello from the other smoke account!'), {
+    label: 'match row preview',
+  })
+  assert(shown, 'the match row preview is missing')
+  assert($('.badge-unread'), 'expected an unread badge on the match row')
+})
+
+await check('the conversation renders the thread and sends a reply', async () => {
+  await click($('.match-row'), 'match row')
+  const shown = await waitFor(() => text().includes('Hello from the other smoke account!'), {
+    label: 'partner message',
+  })
+  assert(shown, 'partner message missing in the thread')
+  assert(path().startsWith('/matches/'), `expected a conversation route, got ${path()}`)
+
+  await fill('.conversation-composer textarea', 'And hello back - matched inside a test!')
+  await click(byText('button', 'Send'), 'send button')
+  const sent = await waitFor(() => $$('.bubble').length >= 2, { label: 'reply bubble' })
+  assert(sent, 'the reply never rendered')
+})
+
+await check('reading the thread clears the unread badge', async () => {
+  await click(byText('a.nav-link', 'Matches'), 'matches link')
+  const cleared = await waitFor(() => !$('.badge-unread'), { label: 'badge to clear' })
+  assert(cleared, 'the unread badge survived reading the thread')
+})
+
+await check('the notification centre lists like, match and message', async () => {
+  await click($('a.nav-bell'), 'notification bell')
+  const loaded = await waitFor(
+    () => text().includes('liked you') && text().includes('matched with'),
+    { label: 'notifications to load' },
+  )
+  assert(loaded, 'expected like and match notifications')
+  assertText(text(), 'Hello from the other smoke account!', 'message preview')
+  const badged = await waitFor(() => Boolean($('.nav-bell-badge')), { label: 'bell badge' })
+  assert(badged, 'the bell should show unread before marking')
+
+  await click(byText('button', 'Mark all read'), 'mark all read')
+  const cleared = await waitFor(() => !$('.nav-bell-badge') && !$('.notification-row.unread'), {
+    label: 'unread state to clear',
+  })
+  assert(cleared, 'unread state survived mark-all-read')
+})
+
+await check('blocking from the conversation closes the match', async () => {
+  await click(byText('a.nav-link', 'Matches'), 'matches link')
+  await click($('.match-row'), 'match row')
+  await click(byText('button', '⋯'), 'conversation menu')
+  await click(byText('button[role="menuitem"]', 'Block member'), 'block menu item')
+  await click(byText('.modal-foot button', 'Block'), 'confirm block')
+  const gone = await waitFor(
+    () => path() === '/matches' && (text().includes('No matches yet') || !$('.match-row')),
+    { label: 'match to disappear' },
+  )
+  assert(gone, 'blocking did not remove the match')
+})
+
+await check('settings lists blocked members and can unblock them', async () => {
+  await act(async () => {
+    window.history.pushState({}, '', '/settings')
+    window.dispatchEvent(new window.PopStateEvent('popstate'))
+  })
+  await settle(120)
+  await click(byText('button.tab', 'Privacy & visibility'), 'privacy tab')
+  const listed = await waitFor(() => text().includes('Smoke Buddy'), { label: 'blocked list' })
+  assert(listed, 'the blocked member is not listed')
+  await click(byText('button', 'Unblock'), 'unblock button')
+  const emptied = await waitFor(() => text().includes('You have not blocked anyone.'), {
+    label: 'empty blocked list',
+  })
+  assert(emptied, 'unblocking did not clear the list')
+})
+
+await check('search filters exclude people outside the filters', async () => {
+  await click(byText('a.nav-link', 'Discover'), 'discover link')
+  await click(byText('button.segmented-item', 'Search & filters'), 'search mode')
+  await fill('input[placeholder="e.g. chef"]', 'Buddy')
+  await fill('input[placeholder="e.g. Accra"]', 'Lagos')
+  await click(byText('button', 'Search profiles'), 'search button')
+  const empty = await waitFor(() => text().includes('Nobody fits those filters'), {
+    label: 'empty search results',
+  })
+  assert(empty, 'the location filter should exclude the Accra buddy')
+})
+
 /* leave the database as we found it: delete the account this run created */
 await check('the account created by this test run can delete itself', async () => {
   const token = window.localStorage.getItem('streetmeet.token')
@@ -516,6 +707,15 @@ await check('the account created by this test run can delete itself', async () =
   const payload = await response.json()
   assert(response.status === 200, `delete responded ${response.status}: ${payload.message}`)
   assert(payload.data.deleted === true, 'expected a permanent deletion')
+
+  if (dating.buddyToken) {
+    const buddyDelete = await nodeFetch(`${BACKEND}/api/settings/account`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${dating.buddyToken}` },
+      body: JSON.stringify({ password: 'Street1234', mode: 'delete', confirmText: 'DELETE' }),
+    })
+    assert(buddyDelete.ok, `buddy delete responded ${buddyDelete.status}`)
+  }
 })
 
 /* sign out */

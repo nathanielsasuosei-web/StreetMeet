@@ -44,7 +44,8 @@ src/
                         Avatar, Card, Modal, PhotoUploader, AgeRange, PasswordStrength
   components/           Navbar, Footer, AppLayout, ProtectedRoute/GuestRoute, ComingSoon
   pages/                Home, Register, Login, Onboarding, Profile, EditProfile, Settings,
-                        Terms, Privacy, NotFound, and ComingSoon wrappers for modules 2-6
+                        Discover, Matches, Conversation, Notifications, Terms, Privacy,
+                        NotFound, and ComingSoon wrappers for modules 3-6
 scripts/ui-smoke.mjs    DOM-level end-to-end test
 ```
 
@@ -59,7 +60,11 @@ scripts/ui-smoke.mjs    DOM-level end-to-end test
 | `/profile` | signed in | Your profile + completion checklist |
 | `/profile/edit` | signed in | Edit everything, including the photo |
 | `/settings` | signed in | Five tabs: account, privacy, notifications, preferences, security |
-| `/matches`, `/messages`, `/status`, `/premium` | signed in | `ComingSoon` placeholders - those modules are not rebuilt yet |
+| `/discover` | signed in | swipe deck + search/filter grid (module 2) |
+| `/matches`, `/matches/:matchId` | signed in | match list and conversation (module 2) |
+| `/notifications` | signed in | likes, matches and messages (module 2) |
+| `/messages` | signed in | redirects to `/matches` |
+| `/status`, `/premium` | signed in | `ComingSoon` placeholders - those modules are not rebuilt yet |
 | `*` | public | 404 |
 
 `ProtectedRoute` sends anonymous visitors to `/login` and remembers where they were heading;

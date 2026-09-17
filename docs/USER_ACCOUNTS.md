@@ -257,7 +257,8 @@ sign out. It also fails if React logs an unexpected `console.error`.
   password" case.
 * **Two-factor authentication** has a setting and a UI row marked "soon"; it needs the verification
   module.
-* **`isMatch`** in `toPublicProfile` is hard-coded to `false` until module 2 can say whether two
+* **`isMatch`** in `toPublicProfile` is still supplied by callers as `false`; module 2 now knows
+  match state (see docs/DATING_FEATURES.md) but the public-profile view has not been switched to
   members matched - `MATCHES_ONLY` profiles are therefore restricted for everyone right now.
 * **Distance filtering** stores `max_distance_km` and `city` but has no geocoding yet; module 2 will
   need coordinates (or a city-distance table) to use it.

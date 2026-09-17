@@ -12,8 +12,13 @@ import { env } from "./config/env.js";
 import db from "./db/index.js";
 
 import authRoutes from "./routes/authRoutes.js";
+import discoverRoutes from "./routes/discoverRoutes.js";
+import matchRoutes from "./routes/matchRoutes.js";
+import moderationRoutes from "./routes/moderationRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
+import swipeRoutes from "./routes/swipeRoutes.js";
 
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 import { apiLimiter } from "./middleware/rateLimiters.js";
@@ -25,8 +30,6 @@ import { apiLimiter } from "./middleware/rateLimiters.js";
  * API at boot - several of them import files that no longer exist.
  */
 const LEGACY_MODULES = [
-  { mount: "/api/matches", name: "matching", file: "./routes/matchRoutes.js" },
-  { mount: "/api/chat", name: "chat", file: "./routes/chatRoutes.js" },
   { mount: "/api/status", name: "status", file: "./routes/statusRoutes.js" },
   { mount: "/api/payment", name: "payments", file: "./routes/paymentRoutes.js" },
   { mount: "/api/admin", name: "admin", file: "./routes/adminRoutes.js" },
@@ -158,6 +161,13 @@ export async function createApp() {
   app.use("/api/auth", authRoutes);
   app.use("/api/profile", profileRoutes);
   app.use("/api/settings", settingsRoutes);
+
+  /* ── Module 2: dating ────────────────────────────────────────────────── */
+  app.use("/api/discover", discoverRoutes);
+  app.use("/api/swipes", swipeRoutes);
+  app.use("/api/matches", matchRoutes);
+  app.use("/api/notifications", notificationRoutes);
+  app.use("/api", moderationRoutes); // /users/:id/block|report, /blocks
 
   /* ── Modules 2-6: guarded until they are rebuilt ─────────────────────── */
   for (const module of legacy) {

@@ -52,6 +52,24 @@ export function formatDateTime(value) {
 }
 
 /** A stable colour per member, used for initial avatars. */
+/** Compact relative time ("now", "4m", "3h", "2d") for lists and badges. */
+export function timeAgo(value) {
+  if (!value) return ''
+  const then = new Date(value).getTime()
+  if (Number.isNaN(then)) return ''
+  const seconds = Math.max(0, Math.round((Date.now() - then) / 1000))
+  if (seconds < 60) return 'now'
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours}h`
+  const days = Math.round(hours / 24)
+  if (days < 7) return `${days}d`
+  const weeks = Math.round(days / 7)
+  if (weeks < 5) return `${weeks}w`
+  return formatDate(value)
+}
+
 export function avatarGradient(seed = '') {
   const hues = [152, 340, 24, 268, 200, 96]
   let hash = 0

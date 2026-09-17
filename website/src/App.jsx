@@ -11,9 +11,14 @@ import Profile from './pages/Profile'
 import EditProfile from './pages/EditProfile'
 import Settings from './pages/Settings'
 
-/* Modules 2-6: placeholders until they are rebuilt. */
+/* Module 2: dating. */
+import Discover from './pages/Discover'
 import Matches from './pages/Matches'
+import Conversation from './pages/Conversation'
+import Notifications from './pages/Notifications'
 import Messages from './pages/Messages'
+
+/* Modules 3-6: placeholders until they are rebuilt. */
 import Status from './pages/Status'
 import Premium from './pages/Premium'
 
@@ -44,7 +49,10 @@ function App() {
             <Route path="/profile/edit" element={<EditProfile />} />
             <Route path="/settings" element={<Settings />} />
 
+            <Route path="/discover" element={<Discover />} />
             <Route path="/matches" element={<Matches />} />
+            <Route path="/matches/:matchId" element={<Conversation />} />
+            <Route path="/notifications" element={<Notifications />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/status" element={<Status />} />
             <Route path="/premium" element={<Premium />} />

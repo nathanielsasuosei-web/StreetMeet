@@ -1,6 +1,7 @@
 # StreetMeet API
 
-Express 5 + a portable SQL data layer. Module 1 (user accounts) is complete and tested; modules 2-6
+Express 5 + a portable SQL data layer. Modules 1 (user accounts) and 2 (dating: discover,
+match, message, moderate) are complete and tested; modules 3-6
 are still in the tree and answer `501`.
 
 Full API reference: **[`../docs/USER_ACCOUNTS.md`](../docs/USER_ACCOUNTS.md)**.
@@ -92,7 +93,7 @@ enum type - use `INTEGER 0/1`, `TEXT` ISO-8601 and `TEXT` + `CHECK`, then normal
 
 ### Legacy modules
 
-`src/routes/{match,chat,status,payment,admin}Routes.js` and their controllers are untouched from the
+`src/routes/{status,payment,admin}Routes.js` and their controllers are untouched from the
 previous implementation. They depend on a Prisma client this environment cannot install, and two of
 them (`paymentController.js` imports `src/models/Subscription.js`, `adminRoutes.js` imports
 `adminController.js` while the file is `adminControllers.js`) reference files that do not exist, so

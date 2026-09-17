@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { PreferencesForm } from '../components/PreferencesForm'
+import { Avatar } from '../components/ui/Avatar'
 import { Button } from '../components/ui/Button'
 import { Card, CardBody, CardFoot, CardHead } from '../components/ui/Card'
 import { Field, PasswordInput, Select, TextInput } from '../components/ui/Field'
@@ -11,7 +12,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import { useCatalogue } from '../hooks/useCatalogue'
 import { api } from '../lib/api'
-import { cx, formatDateTime, passwordChecks } from '../lib/format'
+import { cx, formatDate, formatDateTime, passwordChecks } from '../lib/format'
 
 const TABS = [
   { id: 'account', label: 'Account', icon: '👤' },
@@ -54,10 +55,42 @@ export function Settings() {
   const [preferences, setPreferences] = useState(null)
   const [savingPreferences, setSavingPreferences] = useState(false)
 
+  const [blocked, setBlocked] = useState(null)
+  const [unblockingId, setUnblockingId] = useState(null)
+
   const [dialog, setDialog] = useState(null) // { type, ... }
   const [dialogForm, setDialogForm] = useState({})
   const [dialogErrors, setDialogErrors] = useState({})
   const [dialogBusy, setDialogBusy] = useState(false)
+
+  useEffect(() => {
+    if (tab !== 'privacy') return undefined
+    let active = true
+    api.moderation
+      .blocks()
+      .then((data) => {
+        if (active) setBlocked(data.items)
+      })
+      .catch(() => {
+        if (active) setBlocked([])
+      })
+    return () => {
+      active = false
+    }
+  }, [tab])
+
+  async function unblock(userId) {
+    setUnblockingId(userId)
+    try {
+      await api.moderation.unblock(userId)
+      setBlocked((current) => current.filter((item) => item.profile.id !== userId))
+      toast.success('Unblocked. They can see you in discovery again.')
+    } catch (cause) {
+      toast.error(cause?.message || 'Could not unblock right now.')
+    } finally {
+      setUnblockingId(null)
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -418,6 +451,40 @@ export function Settings() {
                       onChange={(event) => patchSetting('allowMessagesFrom', event.target.value)}
                     />
                   </Field>
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHead
+                  title="Blocked members"
+                  description="Blocked people disappear from your deck and you from theirs. Matches and messages are removed."
+                />
+                <CardBody>
+                  {!blocked ? <p className="muted">Loading…</p> : null}
+                  {blocked && !blocked.length ? (
+                    <p className="muted">You have not blocked anyone.</p>
+                  ) : null}
+                  {blocked?.length ? (
+                    <ul className="blocked-list">
+                      {blocked.map((item) => (
+                        <li key={item.profile.id} className="blocked-row">
+                          <Avatar src={item.profile.profileImage} name={item.profile.fullName} size="md" />
+                          <span className="blocked-row-main">
+                            <strong>{item.profile.fullName}</strong>
+                            <span className="tiny muted">blocked {formatDate(item.blockedAt)}</span>
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            loading={unblockingId === item.profile.id}
+                            onClick={() => unblock(item.profile.id)}
+                          >
+                            Unblock
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </CardBody>
               </Card>
             </>

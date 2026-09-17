@@ -2,14 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../hooks/useAuth'
+import { NotificationBell } from './NotificationBell'
 import { Avatar } from './ui/Avatar'
 import { Button } from './ui/Button'
 
 const PUBLIC_LINKS = [{ to: '/', label: 'Home', end: true }]
 
 const APP_LINKS = [
-  { to: '/matches', label: 'Discover' },
-  { to: '/messages', label: 'Messages' },
+  { to: '/discover', label: 'Discover' },
+  { to: '/matches', label: 'Matches' },
   { to: '/status', label: 'Status' },
   { to: '/premium', label: 'Premium' },
 ]
@@ -78,6 +79,7 @@ export function Navbar() {
         <div className="nav-actions">
           {isAuthenticated ? (
             <>
+              <NotificationBell />
               {!profileComplete ? (
                 <Button size="sm" variant="accent" onClick={() => go('/onboarding')}>
                   Finish profile

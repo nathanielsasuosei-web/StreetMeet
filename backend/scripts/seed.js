@@ -145,10 +145,12 @@ async function seed() {
   const passwordHash = await hashPassword(PASSWORD);
   const now = new Date().toISOString();
   let created = 0;
+  const byEmail = new Map();
 
   for (const demo of DEMO_USERS) {
     const existing = await users.findByEmail(demo.email);
     const id = existing?.id ?? newId();
+    byEmail.set(demo.email, id);
 
     // replace the previous avatar instead of leaving orphaned files behind
     if (existing?.profileImage) removeStoredImage(existing.profileImage);
@@ -203,6 +205,92 @@ async function seed() {
 
     console.log(`   ✓ ${demo.email.padEnd(26)} ${demo.fullName} (${demo.age}, ${demo.city})`);
   }
+
+
+  /* ── Module 2: a small social graph so the demo accounts feel alive ──────
+   * Two mutual-like matches with real threads (one unread message for Ama),
+   * a couple of unanswered likes and one pass. Re-runnable: the demo-only
+   * rows are cleared first, so reseeding never duplicates the graph.      */
+  const idOf = (email) => byEmail.get(email);
+  const minutesAgo = (mins) => new Date(Date.now() - mins * 60_000).toISOString();
+  const demoIds = [...byEmail.values()];
+  const ph = demoIds.map(() => "?").join(", ");
+  await db.run(`DELETE FROM notifications WHERE user_id IN (${ph})`, demoIds);
+  await db.run(`DELETE FROM messages WHERE sender_id IN (${ph})`, demoIds);
+  await db.run(`DELETE FROM matches WHERE user_one_id IN (${ph})`, demoIds);
+  await db.run(`DELETE FROM likes WHERE sender_id IN (${ph})`, demoIds);
+
+  const addLike = (from, to, decision, mins) =>
+    db.run(
+      "INSERT INTO likes (id, sender_id, receiver_id, decision, created_at) VALUES (?, ?, ?, ?, ?)",
+      [newId(), idOf(from), idOf(to), decision, minutesAgo(mins)],
+    );
+
+  const addMatch = async (a, b, mins) => {
+    const [one, two] = idOf(a) < idOf(b) ? [idOf(a), idOf(b)] : [idOf(b), idOf(a)];
+    const id = newId();
+    await db.run(
+      "INSERT INTO matches (id, user_one_id, user_two_id, created_at) VALUES (?, ?, ?, ?)",
+      [id, one, two, minutesAgo(mins)],
+    );
+    return id;
+  };
+
+  const addMessage = (matchId, from, to, content, mins, seen) =>
+    db.run(
+      `INSERT INTO messages (id, sender_id, receiver_id, match_id, content, seen, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [newId(), idOf(from), idOf(to), matchId, content, seen ? 1 : 0, minutesAgo(mins)],
+    );
+
+  const addNotification = (user, type, actor, matchId, payload, mins, read) =>
+    db.run(
+      `INSERT INTO notifications (id, user_id, type, actor_id, match_id, payload, read_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        newId(),
+        idOf(user),
+        type,
+        actor ? idOf(actor) : null,
+        matchId,
+        payload ? JSON.stringify(payload) : null,
+        read ? minutesAgo(read) : null,
+        minutesAgo(mins),
+      ],
+    );
+
+  // mutual likes -> matches
+  await addLike("ama@streetmeet.dev", "kwame@streetmeet.dev", "LIKE", 300);
+  await addLike("kwame@streetmeet.dev", "ama@streetmeet.dev", "LIKE", 290);
+  const matchOne = await addMatch("ama@streetmeet.dev", "kwame@streetmeet.dev", 288);
+
+  await addLike("zainab@streetmeet.dev", "efua@streetmeet.dev", "LIKE", 250);
+  await addLike("efua@streetmeet.dev", "zainab@streetmeet.dev", "LIKE", 240);
+  const matchTwo = await addMatch("zainab@streetmeet.dev", "efua@streetmeet.dev", 238);
+
+  // threads
+  await addMessage(matchOne, "kwame@streetmeet.dev", "ama@streetmeet.dev", "Hey Ama! Fellow jollof critic, I see. What is your ruling on the Lagos vs Accra debate?", 200, true);
+  await addMessage(matchOne, "ama@streetmeet.dev", "kwame@streetmeet.dev", "Haha, diplomatically: Accra wins on spice, Lagos wins on portion size. You?", 190, true);
+  await addMessage(matchOne, "kwame@streetmeet.dev", "ama@streetmeet.dev", "Correct answer. I have a playlist and a restaurant shortlist, in that order.", 100, true);
+  await addMessage(matchOne, "kwame@streetmeet.dev", "ama@streetmeet.dev", "There is a highlife night on Friday at the beach club - interested?", 20, false);
+  await addMessage(matchTwo, "efua@streetmeet.dev", "zainab@streetmeet.dev", "Fellow overthinker detected. Which board game are you destroying me at first?", 150, true);
+  await addMessage(matchTwo, "zainab@streetmeet.dev", "efua@streetmeet.dev", "Wingspan. I have been practising on my plant mice.", 140, true);
+
+  // one-way likes and a pass
+  await addLike("thabo@streetmeet.dev", "ama@streetmeet.dev", "LIKE", 60);
+  await addLike("zainab@streetmeet.dev", "kwame@streetmeet.dev", "LIKE", 50);
+  await addLike("kwame@streetmeet.dev", "zainab@streetmeet.dev", "PASS", 40);
+
+  // notifications to match the graph
+  await addNotification("ama@streetmeet.dev", "MATCH", "kwame@streetmeet.dev", matchOne, null, 288, 280);
+  await addNotification("kwame@streetmeet.dev", "MATCH", "ama@streetmeet.dev", matchOne, null, 288, 280);
+  await addNotification("zainab@streetmeet.dev", "MATCH", "efua@streetmeet.dev", matchTwo, null, 238, 230);
+  await addNotification("efua@streetmeet.dev", "MATCH", "zainab@streetmeet.dev", matchTwo, null, 238, 230);
+  await addNotification("ama@streetmeet.dev", "MESSAGE", "kwame@streetmeet.dev", matchOne, { preview: "There is a highlife night on Friday at the beach club - interested?" }, 20, null);
+  await addNotification("ama@streetmeet.dev", "LIKE", "thabo@streetmeet.dev", null, null, 60, null);
+  await addNotification("kwame@streetmeet.dev", "LIKE", "zainab@streetmeet.dev", null, null, 50, null);
+
+  console.log("   ✓ social graph: 2 matches, 6 messages, 3 open notifications for ama@");
 
   console.log(
     `\n   ${created} created, ${DEMO_USERS.length - created} updated. Password for all demo accounts: ${PASSWORD}`

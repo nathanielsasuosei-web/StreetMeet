@@ -313,6 +313,246 @@ await check("GET /api/profile/unknown-id returns 404", async () => {
   assertEqual(status, 404, "status");
 });
 
+/* ── module 2: discover, swipe, match, message, moderate, notify ───────── */
+const dating = {};
+
+async function registerOnboard({ name, gender, birthDate, city, interestedIn, minAge, maxAge }) {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const mail = `smoke.${slug}.${Date.now()}@streetmeet.dev`;
+  const reg = await api("POST", "/api/auth/register", {
+    body: { fullName: name, email: mail, password, confirmPassword: password },
+  });
+  assertEqual(reg.status, 201, `${name} register`);
+  const onboard = await api("POST", "/api/profile/onboard", {
+    token: reg.body.data.token,
+    body: {
+      gender,
+      birthDate,
+      city,
+      country: "Ghana",
+      bio: "Smoke test profile with enough words in the bio to pass validation rules.",
+      interests: ["coffee", "tech", "travel"],
+      interestedIn,
+      minAge,
+      maxAge,
+    },
+  });
+  assertEqual(onboard.status, 200, `${name} onboard`);
+  return { token: reg.body.data.token, id: reg.body.data.user.id };
+}
+
+await check("GET /api/discover/deck offers only compatible, complete members", async () => {
+  dating.b = await registerOnboard({
+    name: "Smoke Buddy", gender: "MAN", birthDate: "1985-02-02", city: "Tema",
+    interestedIn: ["WOMAN"], minAge: 25, maxAge: 40,
+  });
+  dating.d = await registerOnboard({
+    name: "Smoke Decoy", gender: "MAN", birthDate: "1990-06-06", city: "Tema",
+    interestedIn: ["WOMAN"], minAge: 25, maxAge: 40,
+  });
+  dating.incomplete = await api("POST", "/api/auth/register", {
+    body: {
+      fullName: "Incomplete Person",
+      email: `smoke.incomplete.${Date.now()}@streetmeet.dev`,
+      password,
+      confirmPassword: password,
+    },
+  });
+
+  const { status, body } = await api("GET", "/api/discover/deck", { token: session.token });
+  assertEqual(status, 200, "status");
+  const ids = body.data.items.map((card) => card.id);
+  assert(ids.includes(dating.b.id), "compatible onboarded member is offered");
+  assert(ids.includes(dating.d.id), "second compatible member is offered");
+  assert(!ids.includes(dating.incomplete.body.data.user.id), "incomplete profiles stay hidden");
+  const card = body.data.items.find((entry) => entry.id === dating.b.id);
+  assertEqual(card.age, 41, "card age is derived");
+  assert(card.interests.length === 3, "card carries interests");
+});
+
+await check("POST /api/swipes PASS removes the profile from the deck", async () => {
+  const swipe = await api("POST", "/api/swipes", {
+    token: session.token,
+    body: { targetId: dating.d.id, decision: "PASS" },
+  });
+  assertEqual(swipe.status, 200, "status");
+  assertEqual(swipe.body.data.matched, false, "a pass never matches");
+
+  const deck = await api("GET", "/api/discover/deck", { token: session.token });
+  assert(!deck.body.data.items.some((card) => card.id === dating.d.id), "passed profile is gone");
+});
+
+await check("POST /api/swipes LIKE without a reciprocal like does not match", async () => {
+  const { status, body } = await api("POST", "/api/swipes", {
+    token: session.token,
+    body: { targetId: dating.b.id, decision: "LIKE" },
+  });
+  assertEqual(status, 200, "status");
+  assertEqual(body.data.matched, false, "one-sided like is not a match");
+
+  const dup = await api("POST", "/api/swipes", {
+    token: session.token,
+    body: { targetId: dating.b.id, decision: "LIKE" },
+  });
+  assertEqual(dup.status, 409, "swiping twice is a conflict");
+});
+
+await check("a reciprocal LIKE creates the match and notifies both", async () => {
+  const { status, body } = await api("POST", "/api/swipes", {
+    token: dating.b.token,
+    body: { targetId: session.id, decision: "LIKE" },
+  });
+  assertEqual(status, 201, "status");
+  assertEqual(body.data.matched, true, "mutual like matches");
+  dating.matchId = body.data.match.id;
+
+  const mine = await api("GET", "/api/matches", { token: session.token });
+  assert(mine.body.data.items.some((m) => m.id === dating.matchId), "match listed for me");
+  const theirs = await api("GET", "/api/matches", { token: dating.b.token });
+  const row = theirs.body.data.items.find((m) => m.id === dating.matchId);
+  assert(row, "match listed for them");
+  assertEqual(row.partner.id, session.id, "partner card is me");
+
+  const notes = await api("GET", "/api/notifications", { token: session.token });
+  assert(notes.body.data.items.some((n) => n.type === "MATCH"), "match notification for me");
+});
+
+await check("matched partners leave the discover deck", async () => {
+  const { body } = await api("GET", "/api/discover/deck", { token: session.token });
+  assert(!body.data.items.some((card) => card.id === dating.b.id), "partner not re-offered");
+});
+
+await check("POST /api/matches/:id/messages sends and notifies the receiver", async () => {
+  const { status, body } = await api("POST", `/api/matches/${dating.matchId}/messages`, {
+    token: session.token,
+    body: { content: "Hello from the smoke test!" },
+  });
+  assertEqual(status, 201, "status");
+  assertEqual(body.data.mine, true, "message echoes as mine");
+
+  const theirs = await api("GET", "/api/matches", { token: dating.b.token });
+  const row = theirs.body.data.items.find((m) => m.id === dating.matchId);
+  assertEqual(row.unread, 1, "receiver sees one unread");
+  assertEqual(row.lastMessage.content, "Hello from the smoke test!", "preview text");
+
+  const notes = await api("GET", "/api/notifications", { token: dating.b.token });
+  const note = notes.body.data.items.find((n) => n.type === "MESSAGE");
+  assert(note, "message notification exists");
+  assertEqual(note.payload.preview, "Hello from the smoke test!", "preview payload");
+});
+
+await check("GET /api/matches/:id/messages returns the thread in order", async () => {
+  await api("POST", `/api/matches/${dating.matchId}/messages`, {
+    token: dating.b.token,
+    body: { content: "And a reply." },
+  });
+  const { status, body } = await api("GET", `/api/matches/${dating.matchId}/messages`, {
+    token: session.token,
+  });
+  assertEqual(status, 200, "status");
+  assertEqual(body.data.items.length, 2, "two messages");
+  assertEqual(body.data.items[0].mine, true, "oldest first");
+  assertEqual(body.data.items[1].content, "And a reply.", "newest last");
+
+  const stranger = await api("GET", "/api/matches/not-a-match/messages", { token: session.token });
+  assertEqual(stranger.status, 404, "unknown match is 404");
+});
+
+await check("POST /api/matches/:id/read clears the unread counter", async () => {
+  const { status } = await api("POST", `/api/matches/${dating.matchId}/read`, {
+    token: dating.b.token,
+  });
+  assertEqual(status, 200, "status");
+  const theirs = await api("GET", "/api/matches", { token: dating.b.token });
+  const row = theirs.body.data.items.find((m) => m.id === dating.matchId);
+  assertEqual(row.unread, 0, "unread cleared");
+});
+
+await check("GET /api/discover/search honours gender, age and location filters", async () => {
+  const hit = await api("GET", "/api/discover/search?genders=MAN&minAge=35&maxAge=45&location=tema", {
+    token: session.token,
+  });
+  // search keeps passed profiles but hides current match partners
+  assert(hit.body.data.items.some((card) => card.id === dating.d.id), "filter finds the passed member");
+  assert(!hit.body.data.items.some((card) => card.id === dating.b.id), "current match stays out of search");
+
+  const missGender = await api("GET", "/api/discover/search?genders=WOMAN", { token: session.token });
+  assert(!missGender.body.data.items.some((card) => card.id === dating.b.id), "gender filter excludes");
+
+  const missPlace = await api("GET", "/api/discover/search?location=atlantis", { token: session.token });
+  assertEqual(missPlace.body.data.total, 0, "location filter excludes");
+
+  const bad = await api("GET", "/api/discover/search?genders=ROBOT", { token: session.token });
+  assertEqual(bad.status, 422, "unknown gender filter is rejected");
+});
+
+await check("blocking removes the match, the thread and both decks", async () => {
+  const { status } = await api("POST", `/api/users/${dating.b.id}/block`, { token: session.token });
+  assertEqual(status, 200, "status");
+
+  const mine = await api("GET", "/api/matches", { token: session.token });
+  assertEqual(mine.body.data.items.length, 0, "my matches are gone");
+  const theirs = await api("GET", "/api/matches", { token: dating.b.token });
+  assertEqual(theirs.body.data.items.length, 0, "their matches are gone");
+
+  const myDeck = await api("GET", "/api/discover/deck", { token: session.token });
+  assert(!myDeck.body.data.items.some((c) => c.id === dating.b.id), "blocked member hidden from me");
+  const theirDeck = await api("GET", "/api/discover/deck", { token: dating.b.token });
+  assert(!theirDeck.body.data.items.some((c) => c.id === session.id), "I am hidden from them");
+
+  const blocked = await api("GET", "/api/blocks", { token: session.token });
+  assertEqual(blocked.body.data.items[0].profile.id, dating.b.id, "block list shows them");
+
+  const send = await api("POST", `/api/matches/${dating.matchId}/messages`, {
+    token: session.token,
+    body: { content: "still there?" },
+  });
+  assertEqual(send.status, 404, "deleted match refuses messages");
+});
+
+await check("unblocking restores discovery but not the old match", async () => {
+  const { status } = await api("DELETE", `/api/users/${dating.b.id}/block`, { token: session.token });
+  assertEqual(status, 200, "status");
+  const myDeck = await api("GET", "/api/discover/deck", { token: session.token });
+  assert(myDeck.body.data.items.some((c) => c.id === dating.b.id), "swipes were dropped, deck is fresh");
+});
+
+await check("reports need a valid reason and are stored open", async () => {
+  const ok = await api("POST", `/api/users/${dating.b.id}/report`, {
+    token: session.token,
+    body: { reason: "SPAM", details: "Smoke test report." },
+  });
+  assertEqual(ok.status, 201, "status");
+  assertEqual(ok.body.data.status, "OPEN", "report opens");
+
+  const bad = await api("POST", `/api/users/${dating.b.id}/report`, {
+    token: session.token,
+    body: { reason: "BECAUSE" },
+  });
+  assertEqual(bad.status, 422, "invalid reason rejected");
+  assert(bad.body.fields?.reason, "field error for reason");
+});
+
+await check("notifications list unread counts and mark-all-read", async () => {
+  const before = await api("GET", "/api/notifications", { token: dating.b.token });
+  assert(before.body.data.unread >= 1, "they have unread notifications");
+
+  const all = await api("POST", "/api/notifications/read", { token: dating.b.token });
+  assertEqual(all.status, 200, "status");
+  assertEqual(all.body.data.unread, 0, "unread cleared");
+
+  const after = await api("GET", "/api/notifications", { token: dating.b.token });
+  assert(after.body.data.items.every((n) => n.readAt), "everything read");
+});
+
+await check("messaging requires a real match you belong to", async () => {
+  const stranger = await api("POST", `/api/matches/${dating.matchId}/messages`, {
+    token: dating.d.token,
+    body: { content: "let me in" },
+  });
+  assertEqual(stranger.status, 404, "non-members get 404");
+});
+
 /* ── settings ──────────────────────────────────────────────────────────── */
 await check("GET /api/settings returns settings + account summary", async () => {
   const { status, body } = await api("GET", "/api/settings", { token: session.token });
@@ -457,7 +697,7 @@ await check("POST /api/auth/reactivate restores the account", async () => {
 
 /* ── other modules stay honest ─────────────────────────────────────────── */
 await check("unmigrated modules answer 501 instead of crashing", async () => {
-  const { status, body } = await api("GET", "/api/matches/discover", { token: session.token });
+  const { status, body } = await api("GET", "/api/status/feed", { token: session.token });
   assertEqual(status, 501, "status");
   assertEqual(body.code, "MODULE_NOT_MIGRATED", "code");
 });

@@ -32,6 +32,23 @@ export const ROLES = ["USER", "MODERATOR", "ADMIN"];
 export const AGE_LIMITS = { min: 18, max: 99, defaultMin: 18, defaultMax: 45 };
 export const DISTANCE_STEPS_KM = [5, 10, 25, 50, 100, 250];
 export const BIO_MAX_LENGTH = 500;
+export const MESSAGE_MAX_LENGTH = 1000;
+export const MESSAGE_MIN_LENGTH = 1;
+export const REPORT_REASONS = [
+  "FAKE_PROFILE",
+  "HARASSMENT",
+  "SPAM",
+  "INAPPROPRIATE_CONTENT",
+  "UNDERAGE",
+  "OTHER",
+];
+export const REPORT_DETAILS_MAX = 500;
+export const DECK_LIMIT_DEFAULT = 12;
+export const DECK_LIMIT_MAX = 24;
+export const SEARCH_LIMIT_DEFAULT = 24;
+export const SEARCH_LIMIT_MAX = 50;
+export const NOTIFICATION_LIMIT_DEFAULT = 30;
+export const NOTIFICATION_LIMIT_MAX = 50;
 export const INTERESTS_MIN = 3;
 export const INTERESTS_MAX = 10;
 export const NAME_MIN_LENGTH = 2;
