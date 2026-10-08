@@ -1,5 +1,5 @@
-function Login() {
-  return <h1>Login Page</h1>;
+function Profile() {
+  return <h1>Profile Page</h1>;
 }
 
 export default Profile;

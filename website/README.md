@@ -1,16 +1,38 @@
-# React + Vite
+# KAIRO Beats storefront
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A responsive React/Vite storefront for a beat producer, paired with the Django service in `../django_backend`. It includes the animated hero, beat catalogue and audio previews, artist accounts, producer uploads, payment checkout, purchase history and email updates.
 
-Currently, two official plugins are available:
+## Run with the Django backend
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Terminal 1:
 
-## React Compiler
+```bash
+cd ../django_backend
+python3 -m venv .venv
+source .venv/bin/activate             # Windows: .venv\\Scripts\\activate
+pip install -r requirements.txt
+cp .env.example .env
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver 0.0.0.0:8000
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Terminal 2:
 
-## Expanding the Oxlint configuration
+```bash
+cd website
+npm install
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+Vite proxies `/api/`, `/admin/` and public preview/video media to Django. Sign in at `/admin/` with the superuser to upload masters, optional public preview clips and videos, and review orders. The React producer console links to Django admin. Public catalogue responses expose only preview files; purchased master files are downloaded through signed links after a verified paid order.
+
+## Preview without Django
+
+`npm run dev` still shows a browser-only preview if Django is not running. Local uploads and demo orders stay in that browser, and do not process payments or send emails. With Django running but without `PAYSTACK_SECRET_KEY`, checkout creates a clearly marked `DEMO` order in development.
+
+## Turning on live services
+
+Configure the environment variables in `django_backend/.env.example`: Paystack secret key, enabled payment channels, HTTPS site URLs, SMTP settings and the producer notification email. Register `/api/payments/paystack/webhook/` with Paystack. The backend verifies the transaction server-to-server and checks its status, reference, amount and currency before marking an order paid and emailing a signed seven-day download link. Paystack payment channels differ by merchant market; confirm the enabled MoMo/bank/card channels in the merchant dashboard.
+
+For production, use PostgreSQL, set `DJANGO_DEBUG=false` and a strong secret, deploy behind HTTPS, and move media to private/object storage. Configure a public CDN/object bucket for previews and videos separately from protected beat masters. Never commit `.env`, database files, private beat files, or gateway/email secrets.
